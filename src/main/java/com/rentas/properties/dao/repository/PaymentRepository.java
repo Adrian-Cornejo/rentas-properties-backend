@@ -1,0 +1,37 @@
+package com.rentas.properties.dao.repository;
+
+import com.rentas.properties.dao.entity.Payment;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+public interface PaymentRepository extends JpaRepository<Payment, UUID> {
+
+    List<Payment> findByContractId(UUID contractId);
+
+    List<Payment> findByStatus(String status);
+
+    @Query("SELECT p FROM Payment p WHERE p.status = 'PENDIENTE'")
+    List<Payment> findPendingPayments();
+
+    @Query("SELECT p FROM Payment p WHERE p.status = 'ATRASADO' OR (p.status = 'PENDIENTE' AND p.dueDate < :today)")
+    List<Payment> findOverduePayments(@Param("today") LocalDate today);
+
+    @Query("SELECT p FROM Payment p WHERE p.dueDate = :today AND p.status = 'PENDIENTE'")
+    List<Payment> findPaymentsDueToday(@Param("today") LocalDate today);
+
+    List<Payment> findByPeriodYearAndPeriodMonth(Integer year, Integer month);
+
+    @Query("SELECT p FROM Payment p WHERE p.contract.id = :contractId " +
+            "AND p.periodYear = :year AND p.periodMonth = :month")
+    Optional<Payment> findByContractAndPeriod(@Param("contractId") UUID contractId,
+                                              @Param("year") Integer year,
+                                              @Param("month") Integer month);
+}
