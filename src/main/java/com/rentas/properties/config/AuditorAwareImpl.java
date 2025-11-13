@@ -1,8 +1,12 @@
 package com.rentas.properties.config;
 
+import com.rentas.properties.dao.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -14,43 +18,63 @@ import java.util.UUID;
  *
  * Se usa para llenar automáticamente los campos:
  * - @CreatedBy (created_by)
- * - @LastModifiedBy (cuando se implemente)
+ * - @LastModifiedBy (updated_by)
  *
- * Por ahora retorna un UUID fijo hasta que se implemente Spring Security con JWT.
+ * Obtiene el UUID del usuario autenticado desde el SecurityContext.
  */
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class AuditorAwareImpl implements AuditorAware<UUID> {
 
-    // UUID del usuario admin por defecto (del script SQL de inicialización)
-    // Este es temporal hasta implementar Spring Security
-    private static final UUID DEFAULT_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private final UserRepository userRepository;
 
     @Override
     public Optional<UUID> getCurrentAuditor() {
-        // Intenta obtener el usuario autenticado del SecurityContext
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        // Si no hay autenticación o es usuario anónimo, retorna el usuario por defecto
-        if (authentication == null
-                || !authentication.isAuthenticated()
-                || "anonymousUser".equals(authentication.getPrincipal())) {
-            return Optional.of(DEFAULT_USER_ID);
-        }
-
-        // TODO: Cuando implementes Spring Security con JWT, descomentar esto:
-        /*
         try {
-            // Asume que el principal es un UserDetails personalizado con getId()
-            if (authentication.getPrincipal() instanceof UserDetailsImpl userDetails) {
-                return Optional.of(userDetails.getId());
-            }
-        } catch (Exception e) {
-            // Si hay algún error, usa el usuario por defecto
-            return Optional.of(DEFAULT_USER_ID);
-        }
-        */
+            // Obtener autenticación del SecurityContext
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        // Por ahora, siempre retorna el usuario por defecto
-        return Optional.of(DEFAULT_USER_ID);
+            // Si no hay autenticación o es anónimo, retornar empty
+            if (authentication == null
+                    || !authentication.isAuthenticated()
+                    || "anonymousUser".equals(authentication.getPrincipal())) {
+                log.debug("No hay usuario autenticado - createdBy será NULL");
+                return Optional.empty();
+            }
+
+            Object principal = authentication.getPrincipal();
+
+            // Si el principal es UserDetails (Spring Security estándar)
+            if (principal instanceof UserDetails userDetails) {
+                String email = userDetails.getUsername();
+                log.debug("Buscando UUID para usuario: {}", email);
+
+                // Buscar el usuario en la BD por email
+                return userRepository.findByEmail(email)
+                        .map(user -> {
+                            log.debug("Usuario encontrado - ID: {} | Email: {}", user.getId(), email);
+                            return user.getId();
+                        })
+                        .or(() -> {
+                            log.warn("Usuario autenticado '{}' no encontrado en BD", email);
+                            return Optional.empty();
+                        });
+            }
+
+            // Si el principal es un String (caso raro, pero posible)
+            if (principal instanceof String email) {
+                log.debug("Principal es String: {}", email);
+                return userRepository.findByEmail(email)
+                        .map(user -> user.getId());
+            }
+
+            log.warn("Principal desconocido: {}", principal.getClass().getName());
+            return Optional.empty();
+
+        } catch (Exception e) {
+            log.error("Error al obtener auditor actual", e);
+            return Optional.empty();
+        }
     }
 }
