@@ -9,8 +9,4 @@ public class LocationHasPropertiesException extends RuntimeException {
     public LocationHasPropertiesException(String message) {
         super(message);
     }
-
-    public LocationHasPropertiesException(String message, Throwable cause) {
-        super(message, cause);
-    }
 }

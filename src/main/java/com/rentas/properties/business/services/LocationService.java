@@ -2,6 +2,7 @@ package com.rentas.properties.business.services;
 
 import com.rentas.properties.api.dto.request.CreateLocationRequest;
 import com.rentas.properties.api.dto.request.UpdateLocationRequest;
+import com.rentas.properties.api.dto.response.LocationDetailResponse;
 import com.rentas.properties.api.dto.response.LocationResponse;
 
 import java.util.List;
@@ -9,19 +10,17 @@ import java.util.UUID;
 
 public interface LocationService {
 
-    List<LocationResponse> findAll(boolean includeInactive);
+    LocationDetailResponse createLocation(CreateLocationRequest request);
 
-    LocationResponse findById(UUID id);
+    List<LocationResponse> getAllLocations(boolean includeInactive);
 
-    LocationResponse create(CreateLocationRequest request);
+    LocationDetailResponse getLocationById(UUID id);
 
-    LocationResponse update(UUID id, UpdateLocationRequest request);
+    LocationDetailResponse updateLocation(UUID id, UpdateLocationRequest request);
 
-    void delete(UUID id);
+    void deleteLocation(UUID id);
 
-    List<LocationResponse> findByCity(String city);
+    List<LocationResponse> getLocationsByCity(String city);
 
-    boolean existsByName(String name);
-
-    void validateLocationCanBeDeleted(UUID id);
+    List<LocationResponse> getActiveLocations();
 }
