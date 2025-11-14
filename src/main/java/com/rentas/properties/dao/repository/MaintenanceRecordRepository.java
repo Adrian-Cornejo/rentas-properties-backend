@@ -29,4 +29,31 @@ public interface MaintenanceRecordRepository extends JpaRepository<MaintenanceRe
     @Query("SELECT m FROM MaintenanceRecord m " +
             "WHERE m.maintenanceDate < :today AND m.status IN ('PENDIENTE', 'EN_PROCESO')")
     List<MaintenanceRecord> findOverdueMaintenance(@Param("today") LocalDate today);
+
+    List<MaintenanceRecord> findByOrganizationId(UUID organizationId);
+
+    List<MaintenanceRecord> findByOrganizationIdAndStatus(UUID organizationId, String status);
+
+    @Query("SELECT m FROM MaintenanceRecord m WHERE m.organization.id = :organizationId AND m.status = 'PENDIENTE'")
+    List<MaintenanceRecord> findPendingMaintenanceByOrganization(@Param("organizationId") UUID organizationId);
+
+    @Query("SELECT m FROM MaintenanceRecord m " +
+            "WHERE m.organization.id = :organizationId " +
+            "AND m.maintenanceType = 'EMERGENCIA' AND m.status IN ('PENDIENTE', 'EN_PROCESO')")
+    List<MaintenanceRecord> findEmergencyMaintenancePendingByOrganization(@Param("organizationId") UUID organizationId);
+
+    @Query("SELECT m FROM MaintenanceRecord m " +
+            "WHERE m.organization.id = :organizationId " +
+            "AND m.maintenanceDate < :today AND m.status IN ('PENDIENTE', 'EN_PROCESO')")
+    List<MaintenanceRecord> findOverdueMaintenanceByOrganization(
+            @Param("organizationId") UUID organizationId,
+            @Param("today") LocalDate today
+    );
+
+    @Query("SELECT COUNT(m) FROM MaintenanceRecord m " +
+            "WHERE m.organization.id = :organizationId AND m.status = :status")
+    Long countByOrganizationIdAndStatus(
+            @Param("organizationId") UUID organizationId,
+            @Param("status") String status
+    );
 }

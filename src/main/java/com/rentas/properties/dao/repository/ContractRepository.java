@@ -30,4 +30,26 @@ public interface ContractRepository extends JpaRepository<Contract, UUID> {
     List<Contract> findContractsWithPendingDeposit();
 
     boolean existsByContractNumber(String contractNumber);
+
+    List<Contract> findByOrganizationId(UUID organizationId);
+
+    List<Contract> findByOrganizationIdAndStatus(UUID organizationId, String status);
+
+    @Query("SELECT c FROM Contract c WHERE c.organization.id = :organizationId AND c.status = 'ACTIVO'")
+    List<Contract> findActiveContractsByOrganization(@Param("organizationId") UUID organizationId);
+
+    @Query("SELECT COUNT(c) FROM Contract c WHERE c.organization.id = :organizationId AND c.status = 'ACTIVO'")
+    Long countActiveByOrganizationId(@Param("organizationId") UUID organizationId);
+
+    @Query("SELECT c FROM Contract c WHERE c.organization.id = :organizationId " +
+            "AND c.endDate BETWEEN :startDate AND :endDate AND c.status = 'ACTIVO'")
+    List<Contract> findContractsExpiringBetweenByOrganization(
+            @Param("organizationId") UUID organizationId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query("SELECT c FROM Contract c WHERE c.organization.id = :organizationId " +
+            "AND c.depositPaid = false AND c.status = 'ACTIVO'")
+    List<Contract> findContractsWithPendingDepositByOrganization(@Param("organizationId") UUID organizationId);
 }

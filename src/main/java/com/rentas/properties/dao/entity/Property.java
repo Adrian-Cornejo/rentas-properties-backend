@@ -19,7 +19,8 @@ import java.util.UUID;
         @Index(name = "idx_properties_status", columnList = "status"),
         @Index(name = "idx_properties_type", columnList = "property_type"),
         @Index(name = "idx_properties_code", columnList = "property_code"),
-        @Index(name = "idx_properties_slug", columnList = "public_url_slug")
+        @Index(name = "idx_properties_slug", columnList = "public_url_slug"),
+        @Index(name = "idx_properties_organization", columnList = "organization_id")
 })
 @Getter
 @Setter
@@ -33,7 +34,11 @@ public class Property extends BaseEntity {
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    // Relación Many-to-One con Location
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id", nullable = false, foreignKey = @ForeignKey(name = "fk_property_organization"))
+    private Organization organization;
+
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "location_id", foreignKey = @ForeignKey(name = "fk_property_location"))
     private Location location;
@@ -144,7 +149,6 @@ public class Property extends BaseEntity {
     @Builder.Default
     private List<MaintenanceRecord> maintenanceRecords = new ArrayList<>();
 
-    // Métodos de utilidad
     public void addImage(PropertyImage image) {
         images.add(image);
         image.setProperty(this);
@@ -198,5 +202,17 @@ public class Property extends BaseEntity {
                 .filter(c -> "ACTIVO".equals(c.getStatus()))
                 .findFirst()
                 .orElse(null);
+    }
+
+    public UUID getOrganizationId() {
+        return organization != null ? organization.getId() : null;
+    }
+
+    public String getOrganizationName() {
+        return organization != null ? organization.getName() : "N/A";
+    }
+
+    public boolean belongsToOrganization(UUID organizationId) {
+        return organization != null && organization.getId().equals(organizationId);
     }
 }

@@ -12,7 +12,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "locations", indexes = {
         @Index(name = "idx_locations_name", columnList = "name"),
-        @Index(name = "idx_locations_is_active", columnList = "is_active")
+        @Index(name = "idx_locations_is_active", columnList = "is_active"),
+        @Index(name = "idx_locations_organization", columnList = "organization_id")
 })
 @Getter
 @Setter
@@ -25,6 +26,10 @@ public class Location extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id", nullable = false, foreignKey = @ForeignKey(name = "fk_location_organization"))
+    private Organization organization;
 
     @NotBlank(message = "El nombre de la ubicación es obligatorio")
     @Size(max = 255)
@@ -86,5 +91,13 @@ public class Location extends BaseEntity {
         if (state != null) sb.append(", ").append(state);
         if (postalCode != null) sb.append(" - ").append(postalCode);
         return sb.toString();
+    }
+
+    public UUID getOrganizationId() {
+        return organization != null ? organization.getId() : null;
+    }
+
+    public String getOrganizationName() {
+        return organization != null ? organization.getName() : "N/A";
     }
 }

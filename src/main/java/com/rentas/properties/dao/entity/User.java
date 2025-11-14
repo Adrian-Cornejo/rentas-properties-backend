@@ -16,7 +16,9 @@ import java.util.UUID;
 @Entity
 @Table(name = "users", indexes = {
         @Index(name = "idx_users_email", columnList = "email"),
-        @Index(name = "idx_users_is_active", columnList = "is_active")
+        @Index(name = "idx_users_is_active", columnList = "is_active"),
+        @Index(name = "idx_users_organization", columnList = "organization_id"),
+        @Index(name = "idx_users_account_status", columnList = "account_status")
 })
 @Getter
 @Setter
@@ -62,6 +64,22 @@ public class User {
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
 
+    // ========== NUEVOS CAMPOS MULTI-TENANT ==========
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id", foreignKey = @ForeignKey(name = "fk_user_organization"))
+    private Organization organization;
+
+    @Column(name = "organization_joined_at")
+    private LocalDateTime organizationJoinedAt;
+
+    @Size(max = 50)
+    @Column(name = "account_status", length = 50)
+    @Builder.Default
+    private String accountStatus = "pending"; // pending, active, suspended
+
+    // ================================================
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -82,11 +100,62 @@ public class User {
     }
 
     // Métodos de utilidad
+
     public boolean isAdmin() {
         return "ADMIN".equalsIgnoreCase(this.role);
     }
 
     public boolean isActiveUser() {
         return Boolean.TRUE.equals(this.isActive);
+    }
+
+    // ========== NUEVOS MÉTODOS MULTI-TENANT ==========
+
+    public boolean hasOrganization() {
+        return organization != null;
+    }
+
+    public boolean isPending() {
+        return "pending".equalsIgnoreCase(this.accountStatus);
+    }
+
+    public boolean isAccountActive() {
+        return "active".equalsIgnoreCase(this.accountStatus);
+    }
+
+    public boolean isSuspended() {
+        return "suspended".equalsIgnoreCase(this.accountStatus);
+    }
+
+    public UUID getOrganizationId() {
+        return organization != null ? organization.getId() : null;
+    }
+
+    public String getOrganizationName() {
+        return organization != null ? organization.getName() : "Sin organización";
+    }
+
+    public boolean isOrganizationOwner() {
+        return organization != null && organization.getOwner() != null
+                && organization.getOwner().getId().equals(this.id);
+    }
+
+    public void joinOrganization(Organization org) {
+        this.organization = org;
+        this.organizationJoinedAt = LocalDateTime.now();
+        this.accountStatus = "active";
+    }
+
+    public void leaveOrganization() {
+        this.organization = null;
+        this.organizationJoinedAt = null;
+        this.accountStatus = "pending";
+    }
+
+    public long getDaysSinceJoined() {
+        if (organizationJoinedAt != null) {
+            return java.time.temporal.ChronoUnit.DAYS.between(organizationJoinedAt, LocalDateTime.now());
+        }
+        return 0;
     }
 }
