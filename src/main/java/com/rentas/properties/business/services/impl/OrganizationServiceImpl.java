@@ -254,7 +254,7 @@ public class OrganizationServiceImpl implements OrganizationService {
         validateUserCanAccessOrganization(currentUser, organization);
 
         Long activeUsers = userRepository.countByOrganizationId(id);
-        Long activeProperties = propertyRepository.countActiveByOrganizationId(id);
+        Long activeProperties = propertyRepository.countActiveByOrganization_Id(id);
 
         return OrganizationStatsResponse.builder()
                 .organizationId(organization.getId())

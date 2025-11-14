@@ -27,20 +27,20 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
 
     boolean existsByEmail(String email);
 
-    List<Tenant> findByOrganizationId(UUID organizationId);
+    List<Tenant> findByOrganization_Id(UUID organizationId);
 
-    List<Tenant> findByOrganizationIdAndIsActiveTrue(UUID organizationId);
+    List<Tenant> findByOrganization_IdAndIsActiveTrue(UUID organizationId);
 
-    Optional<Tenant> findByPhoneAndOrganizationId(String phone, UUID organizationId);
+    Optional<Tenant> findByPhoneAndOrganization_Id(String phone, UUID organizationId);
 
-    Optional<Tenant> findByEmailAndOrganizationId(String email, UUID organizationId);
+    Optional<Tenant> findByEmailAndOrganization_Id(String email, UUID organizationId);
 
-    List<Tenant> findByFullNameContainingIgnoreCaseAndOrganizationId(String name, UUID organizationId);
+    List<Tenant> findByFullNameContainingIgnoreCaseAndOrganization_Id(String name, UUID organizationId);
 
-    boolean existsByPhoneAndOrganizationId(String phone, UUID organizationId);
+    boolean existsByPhoneAndOrganization_Id(String phone, UUID organizationId);
 
-    boolean existsByEmailAndOrganizationId(String email, UUID organizationId);
+    boolean existsByEmailAndOrganization_Id(String email, UUID organizationId);
 
     @Query("SELECT COUNT(t) FROM Tenant t WHERE t.organization.id = :organizationId AND t.isActive = true")
-    Long countActiveByOrganizationId(@Param("organizationId") UUID organizationId);
+    Long countActiveByOrganization_Id(@Param("organizationId") UUID organizationId);
 }

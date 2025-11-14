@@ -51,7 +51,7 @@ public class UserServiceImpl implements UserService {
         }
 
         if (currentUser.getOrganization() != null) {
-            List<User> users = userRepository.findByOrganizationId(currentUser.getOrganization().getId());
+            List<User> users = userRepository.findByOrganization_Id(currentUser.getOrganization().getId());
             log.debug("Usuario regular - Retornando {} usuarios de su organización", users.size());
             return users.stream()
                     .map(this::mapToResponse)
@@ -222,7 +222,7 @@ public class UserServiceImpl implements UserService {
             throw new UnauthorizedAccessException("Debes pertenecer a una organización");
         }
 
-        List<User> users = userRepository.findByOrganizationId(currentUser.getOrganization().getId());
+        List<User> users = userRepository.findByOrganization_Id(currentUser.getOrganization().getId());
 
         log.debug("Se encontraron {} usuarios en la organización", users.size());
 
@@ -261,7 +261,7 @@ public class UserServiceImpl implements UserService {
         if ("ADMIN".equals(currentUser.getRole())) {
             users = userRepository.findByAccountStatus(status);
         } else if (currentUser.getOrganization() != null) {
-            users = userRepository.findByOrganizationIdAndAccountStatus(
+            users = userRepository.findByOrganization_IdAndAccountStatus(
                     currentUser.getOrganization().getId(), status
             );
         } else {

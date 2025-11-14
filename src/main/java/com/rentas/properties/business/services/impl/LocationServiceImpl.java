@@ -45,7 +45,7 @@ public class LocationServiceImpl implements LocationService {
 
         Organization organization = currentUser.getOrganization();
 
-        if (locationRepository.existsByNameAndOrganizationId(request.getName(), organization.getId())) {
+        if (locationRepository.existsByNameAndOrganization_Id(request.getName(), organization.getId())) {
             log.warn("Ya existe una ubicación con el nombre '{}' en la organización {}",
                     request.getName(), organization.getId());
             throw new LocationAlreadyExistsException(
@@ -82,9 +82,9 @@ public class LocationServiceImpl implements LocationService {
 
         List<Location> locations;
         if (includeInactive) {
-            locations = locationRepository.findByOrganizationId(organizationId);
+            locations = locationRepository.findByOrganization_Id(organizationId);
         } else {
-            locations = locationRepository.findByOrganizationIdAndIsActiveTrue(organizationId);
+            locations = locationRepository.findByOrganization_IdAndIsActiveTrue(organizationId);
         }
 
         log.debug("Se encontraron {} ubicaciones", locations.size());
@@ -105,7 +105,7 @@ public class LocationServiceImpl implements LocationService {
         User currentUser = getCurrentUser();
         validateUserCanAccessLocation(currentUser, location);
 
-        Long propertyCount = propertyRepository.countActiveByOrganizationId(location.getOrganization().getId());
+        Long propertyCount = propertyRepository.countActiveByOrganization_Id(location.getOrganization().getId());
 
         LocationDetailResponse response = mapToDetailResponse(location);
         response.setTotalProperties(propertyCount.intValue());
@@ -125,7 +125,7 @@ public class LocationServiceImpl implements LocationService {
         validateUserCanAccessLocation(currentUser, location);
 
         if (request.getName() != null && !request.getName().equals(location.getName())) {
-            if (locationRepository.existsByNameAndOrganizationId(
+            if (locationRepository.existsByNameAndOrganization_Id(
                     request.getName(), location.getOrganization().getId())) {
                 throw new LocationAlreadyExistsException(
                         "Ya existe una ubicación con el nombre '" + request.getName() + "' en tu organización"
@@ -171,7 +171,7 @@ public class LocationServiceImpl implements LocationService {
         User currentUser = getCurrentUser();
         validateUserCanAccessLocation(currentUser, location);
 
-        Long propertyCount = propertyRepository.countActiveByOrganizationId(location.getOrganization().getId());
+        Long propertyCount = propertyRepository.countActiveByOrganization_Id(location.getOrganization().getId());
         if (propertyCount > 0) {
             log.warn("No se puede eliminar la ubicación {} porque tiene {} propiedades asociadas",
                     id, propertyCount);
@@ -196,7 +196,7 @@ public class LocationServiceImpl implements LocationService {
 
         UUID organizationId = currentUser.getOrganization().getId();
 
-        List<Location> locations = locationRepository.findByOrganizationId(organizationId)
+        List<Location> locations = locationRepository.findByOrganization_Id(organizationId)
                 .stream()
                 .filter(loc -> city.equalsIgnoreCase(loc.getCity()))
                 .collect(Collectors.toList());
@@ -218,7 +218,7 @@ public class LocationServiceImpl implements LocationService {
 
         UUID organizationId = currentUser.getOrganization().getId();
 
-        List<Location> locations = locationRepository.findByOrganizationIdAndIsActiveTrue(organizationId);
+        List<Location> locations = locationRepository.findByOrganization_IdAndIsActiveTrue(organizationId);
 
         log.debug("Se encontraron {} ubicaciones activas", locations.size());
 

@@ -30,9 +30,9 @@ public interface MaintenanceRecordRepository extends JpaRepository<MaintenanceRe
             "WHERE m.maintenanceDate < :today AND m.status IN ('PENDIENTE', 'EN_PROCESO')")
     List<MaintenanceRecord> findOverdueMaintenance(@Param("today") LocalDate today);
 
-    List<MaintenanceRecord> findByOrganizationId(UUID organizationId);
+    List<MaintenanceRecord> findByOrganization_Id(UUID organizationId);
 
-    List<MaintenanceRecord> findByOrganizationIdAndStatus(UUID organizationId, String status);
+    List<MaintenanceRecord> findByOrganization_IdAndStatus(UUID organizationId, String status);
 
     @Query("SELECT m FROM MaintenanceRecord m WHERE m.organization.id = :organizationId AND m.status = 'PENDIENTE'")
     List<MaintenanceRecord> findPendingMaintenanceByOrganization(@Param("organizationId") UUID organizationId);

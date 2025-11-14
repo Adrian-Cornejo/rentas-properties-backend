@@ -19,20 +19,20 @@ public interface PropertyRepository extends JpaRepository<Property, UUID> {
 
     List<Property> findByStatusAndIsActiveTrue(String status);
 
-    List<Property> findByLocationId(UUID locationId);
+    List<Property> findByLocation_Id(UUID locationId);
 
     List<Property> findByPropertyType(String propertyType);
 
     boolean existsByPropertyCode(String propertyCode);
 
-    List<Property> findByOrganizationId(UUID organizationId);
+    List<Property> findByOrganization_Id(UUID organizationId);
 
-    List<Property> findByOrganizationIdAndStatus(UUID organizationId, String status);
+    List<Property> findByOrganization_IdAndStatus(UUID organizationId, String status);
 
-    List<Property> findByOrganizationIdAndIsActiveTrue(UUID organizationId);
+    List<Property> findByOrganization_IdAndIsActiveTrue(UUID organizationId);
 
     @Query("SELECT COUNT(p) FROM Property p WHERE p.organization.id = :organizationId AND p.isActive = true")
-    Long countActiveByOrganizationId(@Param("organizationId") UUID organizationId);
+    Long countActiveByOrganization_Id(@Param("organizationId") UUID organizationId);
 
     @Query("SELECT p FROM Property p WHERE p.organization.id = :organizationId AND p.status = 'DISPONIBLE' AND p.isActive = true")
     List<Property> findAvailableByOrganization(@Param("organizationId") UUID organizationId);
