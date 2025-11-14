@@ -20,7 +20,8 @@ import java.util.UUID;
         @Index(name = "idx_maintenance_contract", columnList = "contract_id"),
         @Index(name = "idx_maintenance_status", columnList = "status"),
         @Index(name = "idx_maintenance_date", columnList = "maintenance_date"),
-        @Index(name = "idx_maintenance_type", columnList = "maintenance_type")
+        @Index(name = "idx_maintenance_type", columnList = "maintenance_type"),
+        @Index(name = "idx_maintenance_organization", columnList = "organization_id")
 })
 @Getter
 @Setter
@@ -33,6 +34,12 @@ public class MaintenanceRecord extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
+
+    // ========== NUEVO CAMPO MULTI-TENANT ==========
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id", nullable = false, foreignKey = @ForeignKey(name = "fk_maintenance_organization"))
+    private Organization organization;
+    // ==============================================
 
     // Relación Many-to-One con Property
     @ManyToOne(fetch = FetchType.LAZY)
@@ -97,7 +104,7 @@ public class MaintenanceRecord extends BaseEntity {
     @Builder.Default
     private List<MaintenanceImage> images = new ArrayList<>();
 
-    // Métodos de utilidad
+    // Métodos de utilidad existentes...
     public void addImage(MaintenanceImage image) {
         images.add(image);
         image.setMaintenanceRecord(this);
@@ -205,5 +212,17 @@ public class MaintenanceRecord extends BaseEntity {
         } else {
             this.notes = "Motivo de cancelación: " + reason;
         }
+    }
+
+    public UUID getOrganizationId() {
+        return organization != null ? organization.getId() : null;
+    }
+
+    public String getOrganizationName() {
+        return organization != null ? organization.getName() : "N/A";
+    }
+
+    public boolean belongsToOrganization(UUID organizationId) {
+        return organization != null && organization.getId().equals(organizationId);
     }
 }

@@ -18,7 +18,8 @@ import java.util.UUID;
 @Table(name = "tenants", indexes = {
         @Index(name = "idx_tenants_phone", columnList = "phone"),
         @Index(name = "idx_tenants_name", columnList = "full_name"),
-        @Index(name = "idx_tenants_is_active", columnList = "is_active")
+        @Index(name = "idx_tenants_is_active", columnList = "is_active"),
+        @Index(name = "idx_tenants_organization", columnList = "organization_id")
 })
 @Getter
 @Setter
@@ -31,6 +32,10 @@ public class Tenant extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id", nullable = false, foreignKey = @ForeignKey(name = "fk_tenant_organization"))
+    private Organization organization;
 
     @NotBlank(message = "El nombre completo es obligatorio")
     @Size(max = 255)
@@ -97,5 +102,17 @@ public class Tenant extends BaseEntity {
             sb.append(" | ").append(email);
         }
         return sb.toString();
+    }
+
+    public UUID getOrganizationId() {
+        return organization != null ? organization.getId() : null;
+    }
+
+    public String getOrganizationName() {
+        return organization != null ? organization.getName() : "N/A";
+    }
+
+    public boolean belongsToOrganization(UUID organizationId) {
+        return organization != null && organization.getId().equals(organizationId);
     }
 }

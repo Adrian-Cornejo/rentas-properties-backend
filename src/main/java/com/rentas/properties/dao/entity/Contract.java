@@ -19,7 +19,8 @@ import java.util.UUID;
         @Index(name = "idx_contracts_property", columnList = "property_id"),
         @Index(name = "idx_contracts_status", columnList = "status"),
         @Index(name = "idx_contracts_dates", columnList = "start_date, end_date"),
-        @Index(name = "idx_contracts_number", columnList = "contract_number")
+        @Index(name = "idx_contracts_number", columnList = "contract_number"),
+        @Index(name = "idx_contracts_organization", columnList = "organization_id")
 })
 @Getter
 @Setter
@@ -33,7 +34,10 @@ public class Contract extends BaseEntity {
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    // Relación Many-to-One con Property
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id", nullable = false, foreignKey = @ForeignKey(name = "fk_contract_organization"))
+    private Organization organization;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "property_id", nullable = false, foreignKey = @ForeignKey(name = "fk_contract_property"))
     private Property property;
@@ -131,7 +135,6 @@ public class Contract extends BaseEntity {
     @Builder.Default
     private List<MaintenanceRecord> maintenanceRecords = new ArrayList<>();
 
-    // Métodos de utilidad
     public void addTenant(Tenant tenant, boolean isPrimary, String relationship) {
         ContractTenant contractTenant = ContractTenant.builder()
                 .contract(this)
@@ -211,5 +214,17 @@ public class Contract extends BaseEntity {
                 .map(Payment::getTotalAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 : BigDecimal.ZERO;
+    }
+
+    public UUID getOrganizationId() {
+        return organization != null ? organization.getId() : null;
+    }
+
+    public String getOrganizationName() {
+        return organization != null ? organization.getName() : "N/A";
+    }
+
+    public boolean belongsToOrganization(UUID organizationId) {
+        return organization != null && organization.getId().equals(organizationId);
     }
 }
