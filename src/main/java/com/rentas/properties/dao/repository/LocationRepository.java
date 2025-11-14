@@ -21,14 +21,14 @@ public interface LocationRepository extends JpaRepository<Location, UUID> {
 
     boolean existsByName(String name);
 
-    List<Location> findByOrganizationId(UUID organizationId);
+    List<Location> findByOrganization_Id(UUID organizationId);
 
-    List<Location> findByOrganizationIdAndIsActiveTrue(UUID organizationId);
+    List<Location> findByOrganization_IdAndIsActiveTrue(UUID organizationId);
 
-    Optional<Location> findByNameAndOrganizationId(String name, UUID organizationId);
+    Optional<Location> findByNameAndOrganization_Id(String name, UUID organizationId);
 
-    boolean existsByNameAndOrganizationId(String name, UUID organizationId);
+    boolean existsByNameAndOrganization_Id(String name, UUID organizationId);
 
     @Query("SELECT COUNT(l) FROM Location l WHERE l.organization.id = :organizationId AND l.isActive = true")
-    Long countActiveByOrganizationId(@Param("organizationId") UUID organizationId);
+    Long countActiveByOrganization_Id(@Param("organizationId") UUID organizationId);
 }

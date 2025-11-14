@@ -12,15 +12,21 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LocationResponse {
+public class OrganizationResponse {
 
     private UUID id;
     private String name;
-    private String address;
-    private String city;
-    private String state;
-    private String postalCode;
     private String description;
+    private String logoUrl;
+    private String primaryColor;
+    private String secondaryColor;
+    private String invitationCode;
+    private Integer maxUsers;
+    private Integer maxProperties;
+    private Integer currentUsersCount;
+    private Integer currentPropertiesCount;
+    private String subscriptionStatus;
+    private String subscriptionPlan;
     private Boolean isActive;
     private LocalDateTime createdAt;
 }

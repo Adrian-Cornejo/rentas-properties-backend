@@ -31,15 +31,15 @@ public interface ContractRepository extends JpaRepository<Contract, UUID> {
 
     boolean existsByContractNumber(String contractNumber);
 
-    List<Contract> findByOrganizationId(UUID organizationId);
+    List<Contract> findByOrganization_Id(UUID organizationId);
 
-    List<Contract> findByOrganizationIdAndStatus(UUID organizationId, String status);
+    List<Contract> findByOrganization_IdAndStatus(UUID organizationId, String status);
 
     @Query("SELECT c FROM Contract c WHERE c.organization.id = :organizationId AND c.status = 'ACTIVO'")
     List<Contract> findActiveContractsByOrganization(@Param("organizationId") UUID organizationId);
 
     @Query("SELECT COUNT(c) FROM Contract c WHERE c.organization.id = :organizationId AND c.status = 'ACTIVO'")
-    Long countActiveByOrganizationId(@Param("organizationId") UUID organizationId);
+    Long countActiveByOrganization_Id(@Param("organizationId") UUID organizationId);
 
     @Query("SELECT c FROM Contract c WHERE c.organization.id = :organizationId " +
             "AND c.endDate BETWEEN :startDate AND :endDate AND c.status = 'ACTIVO'")
