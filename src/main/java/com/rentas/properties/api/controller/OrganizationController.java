@@ -54,6 +54,20 @@ public interface OrganizationController {
     ResponseEntity<List<OrganizationResponse>> getAllOrganizations();
 
     @Operation(
+            summary = "Obtener mi organización",
+            description = "Obtiene la organización del usuario autenticado"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Organización encontrada",
+                    content = @Content(schema = @Schema(implementation = OrganizationDetailResponse.class))
+            ),
+            @ApiResponse(responseCode = "404", description = "No tienes organización asignada")
+    })
+    ResponseEntity<OrganizationDetailResponse> getMyOrganization();
+
+    @Operation(
             summary = "Obtener organización por ID",
             description = "Obtiene los detalles de una organización específica"
     )
@@ -141,6 +155,20 @@ public interface OrganizationController {
             @ApiResponse(responseCode = "403", description = "No tienes acceso a esta organización")
     })
     ResponseEntity<OrganizationStatsResponse> getOrganizationStats(@PathVariable UUID id);
+
+    @Operation(
+            summary = "Obtener estadísticas de mi organización",
+            description = "Obtiene estadísticas de la organización del usuario autenticado"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Estadísticas obtenidas exitosamente",
+                    content = @Content(schema = @Schema(implementation = OrganizationStatsResponse.class))
+            ),
+            @ApiResponse(responseCode = "404", description = "No tienes organización asignada")
+    })
+    ResponseEntity<OrganizationStatsResponse> getMyOrganizationStats();
 
     @Operation(
             summary = "Obtener organizaciones activas",

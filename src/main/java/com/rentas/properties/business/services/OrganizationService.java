@@ -7,6 +7,7 @@ import com.rentas.properties.api.dto.response.OrganizationResponse;
 import com.rentas.properties.api.dto.response.OrganizationStatsResponse;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface OrganizationService {
@@ -28,4 +29,8 @@ public interface OrganizationService {
     OrganizationStatsResponse getOrganizationStats(UUID id);
 
     List<OrganizationResponse> getActiveOrganizations();
+
+    Optional<OrganizationDetailResponse> getMyOrganization();
+
+    OrganizationStatsResponse getMyOrganizationStats();
 }
