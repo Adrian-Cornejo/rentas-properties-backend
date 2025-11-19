@@ -60,6 +60,7 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .primaryColor(request.getPrimaryColor() != null ? request.getPrimaryColor() : "#3B82F6")
                 .secondaryColor(request.getSecondaryColor() != null ? request.getSecondaryColor() : "#10B981")
                 .invitationCode(invitationCode)
+                .logoUrl(request.getLogoUrl())
                 .codeIsReusable(true)
                 .owner(currentUser)
                 .maxUsers(3)
