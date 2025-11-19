@@ -316,4 +316,40 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
+
+    @ExceptionHandler(CloudinaryUploadException.class)
+    public ResponseEntity<ErrorResponse> handleCloudinaryUploadException(CloudinaryUploadException ex) {
+        log.error("Cloudinary upload error: {}", ex.getMessage());
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .error("Cloudinary Upload Error")
+                .message(ex.getMessage())
+                .build();
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+    }
+
+    @ExceptionHandler(CloudinaryDeleteException.class)
+    public ResponseEntity<ErrorResponse> handleCloudinaryDeleteException(CloudinaryDeleteException ex) {
+        log.error("Cloudinary delete error: {}", ex.getMessage());
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .error("Cloudinary Delete Error")
+                .message(ex.getMessage())
+                .build();
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+    }
+
+    @ExceptionHandler(InvalidImageFormatException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidImageFormatException(InvalidImageFormatException ex) {
+        log.error("Invalid image format: {}", ex.getMessage());
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Invalid Image Format")
+                .message(ex.getMessage())
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
 }

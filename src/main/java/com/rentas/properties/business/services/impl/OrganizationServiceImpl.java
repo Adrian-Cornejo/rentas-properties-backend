@@ -9,6 +9,7 @@ import com.rentas.properties.api.exception.InvitationCodeAlreadyExistsException;
 import com.rentas.properties.api.exception.InvitationCodeInvalidException;
 import com.rentas.properties.api.exception.OrganizationNotFoundException;
 import com.rentas.properties.api.exception.UnauthorizedAccessException;
+import com.rentas.properties.business.services.CloudinaryService;
 import com.rentas.properties.business.services.OrganizationService;
 import com.rentas.properties.dao.entity.Organization;
 import com.rentas.properties.dao.entity.User;
@@ -37,6 +38,7 @@ public class OrganizationServiceImpl implements OrganizationService {
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
     private final PropertyRepository propertyRepository;
+    private final CloudinaryService cloudinaryService;
 
     @Override
     @Transactional
@@ -136,6 +138,17 @@ public class OrganizationServiceImpl implements OrganizationService {
 
         User currentUser = getCurrentUser();
         validateUserCanModifyOrganization(currentUser, organization);
+
+        String oldLogoUrl = organization.getLogoUrl();
+        String newLogoUrl = request.getLogoUrl();
+
+        if (newLogoUrl != null && !newLogoUrl.equals(oldLogoUrl)) {
+            deleteOldLogoIfExists(oldLogoUrl);
+        }
+
+        if ((newLogoUrl == null || newLogoUrl.isEmpty()) && oldLogoUrl != null) {
+            deleteOldLogoIfExists(oldLogoUrl);
+        }
 
         if (request.getName() != null) {
             organization.setName(request.getName());
@@ -480,5 +493,19 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .createdAt(organization.getCreatedAt())
                 .updatedAt(organization.getUpdatedAt())
                 .build();
+    }
+
+    private void deleteOldLogoIfExists(String oldLogoUrl) {
+        if (oldLogoUrl != null && !oldLogoUrl.isEmpty()) {
+            try {
+                String publicId = cloudinaryService.extractPublicIdFromUrl(oldLogoUrl);
+                if (publicId != null) {
+                    cloudinaryService.deleteImage(publicId);
+                    log.info("Deleted old logo from Cloudinary - publicId: {}", publicId);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to delete old logo from Cloudinary: {}", e.getMessage());
+            }
+        }
     }
 }
