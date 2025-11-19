@@ -43,6 +43,22 @@ public class OrganizationControllerImpl implements OrganizationController {
     }
 
     @Override
+    @GetMapping("/me")
+    public ResponseEntity<OrganizationDetailResponse> getMyOrganization() {
+        log.info("GET /api/v1/organizations/me - Obteniendo organización del usuario autenticado");
+
+        return organizationService.getMyOrganization()
+                .map(response -> {
+                    log.info("Organización encontrada: {}", response.getName());
+                    return ResponseEntity.ok(response);
+                })
+                .orElseGet(() -> {
+                    log.info("Usuario no tiene organización asignada - Retornando 404");
+                    return ResponseEntity.notFound().build();
+                });
+    }
+
+    @Override
     @GetMapping("/{id}")
     public ResponseEntity<OrganizationDetailResponse> getOrganizationById(@PathVariable UUID id) {
         log.info("Obteniendo organización con ID: {}", id);
@@ -95,6 +111,15 @@ public class OrganizationControllerImpl implements OrganizationController {
     public ResponseEntity<OrganizationStatsResponse> getOrganizationStats(@PathVariable UUID id) {
         log.info("Obteniendo estadísticas de organización: {}", id);
         OrganizationStatsResponse stats = organizationService.getOrganizationStats(id);
+        log.info("Estadísticas obtenidas exitosamente");
+        return ResponseEntity.ok(stats);
+    }
+
+    @Override
+    @GetMapping("/me/stats")
+    public ResponseEntity<OrganizationStatsResponse> getMyOrganizationStats() {
+        log.info("GET /api/v1/organizations/me/stats - Obteniendo estadísticas de mi organización");
+        OrganizationStatsResponse stats = organizationService.getMyOrganizationStats();
         log.info("Estadísticas obtenidas exitosamente");
         return ResponseEntity.ok(stats);
     }

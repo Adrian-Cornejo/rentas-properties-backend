@@ -34,15 +34,5 @@ public class CreateOrganizationRequest {
     )
     private String secondaryColor;
 
-    @Positive(message = "El máximo de usuarios debe ser un número positivo")
-    private Integer maxUsers;
 
-    @Positive(message = "El máximo de propiedades debe ser un número positivo")
-    private Integer maxProperties;
-
-    @Pattern(
-            regexp = "^(free|basic|pro|enterprise)$",
-            message = "El plan de suscripción debe ser: free, basic, pro o enterprise"
-    )
-    private String subscriptionPlan;
 }

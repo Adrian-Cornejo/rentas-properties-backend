@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -59,18 +60,29 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .invitationCode(invitationCode)
                 .codeIsReusable(true)
                 .owner(currentUser)
-                .maxUsers(request.getMaxUsers() != null ? request.getMaxUsers() : 3)
-                .maxProperties(request.getMaxProperties() != null ? request.getMaxProperties() : 3)
-                .currentUsersCount(0)
+                .maxUsers(3)
+                .maxProperties(5)
+                .currentUsersCount(1)
                 .currentPropertiesCount(0)
-                .subscriptionStatus("trial")
-                .subscriptionPlan(request.getSubscriptionPlan() != null ? request.getSubscriptionPlan() : "free")
+                .subscriptionStatus("TRIAL")
+                .subscriptionPlan("BASIC")
                 .trialEndsAt(trialEndsAt)
                 .isActive(true)
+                .createdAt(now)
+                .updatedAt(now)
                 .build();
 
         Organization savedOrganization = organizationRepository.save(organization);
         log.info("Organización creada exitosamente con ID: {}", savedOrganization.getId());
+
+        currentUser.setOrganization(savedOrganization);
+        currentUser.setOrganizationJoinedAt(now);
+        currentUser.setAccountStatus("ACTIVE");
+        currentUser.setUpdatedAt(now);
+        userRepository.save(currentUser);
+
+        log.info("Usuario {} asignado como OWNER de la organización {}",
+                currentUser.getEmail(), savedOrganization.getId());
 
         return mapToDetailResponse(savedOrganization);
     }
@@ -286,6 +298,41 @@ public class OrganizationServiceImpl implements OrganizationService {
         return organizations.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<OrganizationDetailResponse> getMyOrganization() {
+        log.info("Obteniendo organización del usuario autenticado");
+
+        User currentUser = getCurrentUser();
+
+        if (currentUser.getOrganization() == null) {
+            log.warn("Usuario {} no tiene organización asignada", currentUser.getEmail());
+            return Optional.empty();
+        }
+
+        Organization organization = currentUser.getOrganization();
+        log.debug("Organización encontrada: {} para usuario: {}", organization.getName(), currentUser.getEmail());
+
+        return Optional.of(mapToDetailResponse(organization));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrganizationStatsResponse getMyOrganizationStats() {
+        log.info("Obteniendo estadísticas de organización del usuario autenticado");
+
+        User currentUser = getCurrentUser();
+
+        if (currentUser.getOrganization() == null) {
+            log.warn("Usuario {} no tiene organización asignada", currentUser.getEmail());
+            throw new OrganizationNotFoundException("No tienes una organización asignada");
+        }
+
+        Organization organization = currentUser.getOrganization();
+
+        return getOrganizationStats(organization.getId());
     }
 
     private User getCurrentUser() {
