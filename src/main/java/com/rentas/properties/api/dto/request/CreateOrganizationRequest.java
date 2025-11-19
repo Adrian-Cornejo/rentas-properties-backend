@@ -34,5 +34,6 @@ public class CreateOrganizationRequest {
     )
     private String secondaryColor;
 
+    private String logoUrl;
 
 }
