@@ -3,6 +3,7 @@ package com.rentas.properties.business.services.impl;
 import com.rentas.properties.api.dto.request.CreateOrganizationRequest;
 import com.rentas.properties.api.dto.request.UpdateOrganizationRequest;
 import com.rentas.properties.api.dto.response.OrganizationDetailResponse;
+import com.rentas.properties.api.dto.response.OrganizationInfoResponse;
 import com.rentas.properties.api.dto.response.OrganizationResponse;
 import com.rentas.properties.api.dto.response.OrganizationStatsResponse;
 import com.rentas.properties.api.exception.InvitationCodeAlreadyExistsException;
@@ -347,6 +348,36 @@ public class OrganizationServiceImpl implements OrganizationService {
         Organization organization = currentUser.getOrganization();
 
         return getOrganizationStats(organization.getId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrganizationInfoResponse getMyOrganizationInfo() {
+        log.info("Obteniendo información básica de organización del usuario autenticado");
+
+        User currentUser = getCurrentUser();
+
+        if (currentUser.getOrganization() == null) {
+            log.warn("Usuario {} no tiene organización asignada", currentUser.getEmail());
+            throw new OrganizationNotFoundException("No tienes una organización asignada");
+        }
+
+        Organization organization = currentUser.getOrganization();
+        log.debug("Organización encontrada: {} para usuario: {}", organization.getName(), currentUser.getEmail());
+
+        return OrganizationInfoResponse.builder()
+                .id(organization.getId())
+                .name(organization.getName())
+                .logoUrl(organization.getLogoUrl())
+                .subscriptionPlan(organization.getSubscriptionPlan())
+                .subscriptionStatus(organization.getSubscriptionStatus())
+                .maxProperties(organization.getMaxProperties())
+                .currentPropertiesCount(organization.getCurrentPropertiesCount())
+                .maxUsers(organization.getMaxUsers())
+                .currentUsersCount(organization.getCurrentUsersCount())
+                .primaryColor(organization.getPrimaryColor())
+                .secondaryColor(organization.getSecondaryColor())
+                .build();
     }
 
     private User getCurrentUser() {

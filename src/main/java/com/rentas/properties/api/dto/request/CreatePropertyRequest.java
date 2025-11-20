@@ -1,5 +1,6 @@
 package com.rentas.properties.api.dto.request;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -7,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -87,4 +89,7 @@ public class CreatePropertyRequest {
 
     @Size(max = 2000, message = "Las notas no deben exceder 2000 caracteres")
     private String notes;
+
+    @Schema(description = "Lista de URLs de imágenes de la propiedad")
+    private List<String> imageUrls;
 }

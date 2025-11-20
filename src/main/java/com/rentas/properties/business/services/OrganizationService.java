@@ -3,6 +3,7 @@ package com.rentas.properties.business.services;
 import com.rentas.properties.api.dto.request.CreateOrganizationRequest;
 import com.rentas.properties.api.dto.request.UpdateOrganizationRequest;
 import com.rentas.properties.api.dto.response.OrganizationDetailResponse;
+import com.rentas.properties.api.dto.response.OrganizationInfoResponse;
 import com.rentas.properties.api.dto.response.OrganizationResponse;
 import com.rentas.properties.api.dto.response.OrganizationStatsResponse;
 
@@ -33,4 +34,6 @@ public interface OrganizationService {
     Optional<OrganizationDetailResponse> getMyOrganization();
 
     OrganizationStatsResponse getMyOrganizationStats();
+
+    OrganizationInfoResponse getMyOrganizationInfo();
 }
