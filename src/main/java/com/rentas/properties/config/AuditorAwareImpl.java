@@ -3,39 +3,42 @@ package com.rentas.properties.config;
 import com.rentas.properties.dao.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Scope;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.WebApplicationContext;
 
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Implementación de AuditorAware para capturar el usuario actual
- * en las operaciones de auditoría JPA.
- *
- * Se usa para llenar automáticamente los campos:
- * - @CreatedBy (created_by)
- * - @LastModifiedBy (updated_by)
- *
- * Obtiene el UUID del usuario autenticado desde el SecurityContext.
- */
 @Slf4j
 @Component
+@Scope(value = WebApplicationContext.SCOPE_REQUEST, proxyMode = ScopedProxyMode.TARGET_CLASS)
 @RequiredArgsConstructor
 public class AuditorAwareImpl implements AuditorAware<UUID> {
 
     private final UserRepository userRepository;
 
+    // Cache para evitar múltiples consultas en la misma request
+    private UUID cachedAuditorId;
+    private boolean alreadyLookedUp = false;
+
     @Override
     public Optional<UUID> getCurrentAuditor() {
+        // Si ya buscamos el auditor en esta request, retornar el cache
+        if (alreadyLookedUp) {
+            return Optional.ofNullable(cachedAuditorId);
+        }
+
+        alreadyLookedUp = true;
+
         try {
-            // Obtener autenticación del SecurityContext
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-            // Si no hay autenticación o es anónimo, retornar empty
             if (authentication == null
                     || !authentication.isAuthenticated()
                     || "anonymousUser".equals(authentication.getPrincipal())) {
@@ -45,28 +48,32 @@ public class AuditorAwareImpl implements AuditorAware<UUID> {
 
             Object principal = authentication.getPrincipal();
 
-            // Si el principal es UserDetails (Spring Security estándar)
+            // Si el principal es UserDetails
             if (principal instanceof UserDetails userDetails) {
                 String email = userDetails.getUsername();
                 log.debug("Buscando UUID para usuario: {}", email);
 
-                // Buscar el usuario en la BD por email
-                return userRepository.findByEmail(email)
+                cachedAuditorId = userRepository.findByEmail(email)
                         .map(user -> {
                             log.debug("Usuario encontrado - ID: {} | Email: {}", user.getId(), email);
                             return user.getId();
                         })
-                        .or(() -> {
+                        .orElseGet(() -> {
                             log.warn("Usuario autenticado '{}' no encontrado en BD", email);
-                            return Optional.empty();
+                            return null;
                         });
+
+                return Optional.ofNullable(cachedAuditorId);
             }
 
-            // Si el principal es un String (caso raro, pero posible)
+            // Si el principal es un String
             if (principal instanceof String email) {
                 log.debug("Principal es String: {}", email);
-                return userRepository.findByEmail(email)
-                        .map(user -> user.getId());
+                cachedAuditorId = userRepository.findByEmail(email)
+                        .map(user -> user.getId())
+                        .orElse(null);
+
+                return Optional.ofNullable(cachedAuditorId);
             }
 
             log.warn("Principal desconocido: {}", principal.getClass().getName());
