@@ -5,11 +5,9 @@ import com.rentas.properties.api.dto.request.UpdatePropertyRequest;
 import com.rentas.properties.api.dto.response.PropertyDetailResponse;
 import com.rentas.properties.api.dto.response.PropertyResponse;
 import com.rentas.properties.api.exception.*;
+import com.rentas.properties.business.services.CloudinaryService;
 import com.rentas.properties.business.services.PropertyService;
-import com.rentas.properties.dao.entity.Location;
-import com.rentas.properties.dao.entity.Organization;
-import com.rentas.properties.dao.entity.Property;
-import com.rentas.properties.dao.entity.User;
+import com.rentas.properties.dao.entity.*;
 import com.rentas.properties.dao.repository.ContractRepository;
 import com.rentas.properties.dao.repository.LocationRepository;
 import com.rentas.properties.dao.repository.OrganizationRepository;
@@ -22,6 +20,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -36,6 +35,7 @@ public class PropertyServiceImpl implements PropertyService {
     private final LocationRepository locationRepository;
     private final OrganizationRepository organizationRepository;
     private final ContractRepository contractRepository;
+    private final CloudinaryService cloudinaryService;
 
     @Override
     @Transactional
@@ -105,6 +105,10 @@ public class PropertyServiceImpl implements PropertyService {
                 .build();
 
         Property savedProperty = propertyRepository.save(property);
+
+        if (request.getImageUrls() != null && !request.getImageUrls().isEmpty()) {
+            processPropertyImages(savedProperty, request.getImageUrls());
+        }
 
         organization.setCurrentPropertiesCount(organization.getCurrentPropertiesCount() + 1);
         organizationRepository.save(organization);
@@ -276,6 +280,10 @@ public class PropertyServiceImpl implements PropertyService {
             property.setNotes(request.getNotes());
         }
 
+        if (request.getImageUrls() != null) {
+            updatePropertyImages(property, request.getImageUrls());
+        }
+
         Property updatedProperty = propertyRepository.save(property);
         log.info("Propiedad actualizada exitosamente: {}", updatedProperty.getPropertyCode());
 
@@ -301,21 +309,22 @@ public class PropertyServiceImpl implements PropertyService {
             log.warn("No se puede eliminar la propiedad {} porque tiene {} contratos activos",
                     id, activeContracts);
             throw new PropertyHasActiveContractsException(
-                    "No se puede eliminar la propiedad porque tiene " + activeContracts + " contratos activos"
+                    "No se puede eliminar la propiedad porque tiene contratos activos. " +
+                            "Primero debes finalizar o cancelar los contratos."
             );
         }
 
-        property.setIsActive(false);
-        propertyRepository.save(property);
-
-        Organization organization = property.getOrganization();
-        if (organization.getCurrentPropertiesCount() > 0) {
-            organization.setCurrentPropertiesCount(organization.getCurrentPropertiesCount() - 1);
-            organizationRepository.save(organization);
+        List<PropertyImage> images = new ArrayList<>(property.getImages());
+        for (PropertyImage image : images) {
+            deleteImageFromCloudinary(image.getImageUrl());
         }
 
-        log.info("Propiedad desactivada exitosamente: {} - Contador de organización: {}/{}",
-                id, organization.getCurrentPropertiesCount(), organization.getMaxProperties());
+        Organization organization = property.getOrganization();
+        organization.setCurrentPropertiesCount(organization.getCurrentPropertiesCount() - 1);
+        organizationRepository.save(organization);
+
+        propertyRepository.delete(property);
+        log.info("Propiedad eliminada exitosamente: {}", id);
     }
 
     @Override
@@ -480,7 +489,139 @@ public class PropertyServiceImpl implements PropertyService {
         }
     }
 
+    private void processPropertyImages(Property property, List<String> imageUrls) {
+        // Validar límite según plan de suscripción
+        int maxImages = getMaxImagesForPlan(property.getOrganization().getSubscriptionPlan());
+
+        if (imageUrls.size() > maxImages) {
+            throw new OrganizationPropertyLimitException(
+                    "Has excedido el límite de " + maxImages + " imágenes por propiedad según tu plan"
+            );
+        }
+
+        // Crear PropertyImage entities
+        for (int i = 0; i < imageUrls.size(); i++) {
+            String imageUrl = imageUrls.get(i);
+            PropertyImage propertyImage = PropertyImage.builder()
+                    .property(property)
+                    .imageUrl(imageUrl)
+                    .imagePublicId(extractPublicIdFromUrl(imageUrl))
+                    .displayOrder(i)
+                    .isMain(i == 0) // Primera imagen es la principal
+                    .createdBy(getCurrentUser().getId())
+                    .build();
+
+            property.addImage(propertyImage);
+        }
+    }
+
+    private void updatePropertyImages(Property property, List<String> newImageUrls) {
+        // Validar límite según plan de suscripción
+        int maxImages = getMaxImagesForPlan(property.getOrganization().getSubscriptionPlan());
+
+        if (newImageUrls.size() > maxImages) {
+            throw new OrganizationPropertyLimitException(
+                    "Has excedido el límite de " + maxImages + " imágenes por propiedad según tu plan"
+            );
+        }
+
+        // Obtener imágenes actuales
+        List<PropertyImage> currentImages = new ArrayList<>(property.getImages());
+
+        // Identificar y eliminar imágenes que ya no están en la nueva lista
+        for (PropertyImage currentImage : currentImages) {
+            if (!newImageUrls.contains(currentImage.getImageUrl())) {
+                // Eliminar de Cloudinary si tiene publicId
+                deleteImageFromCloudinary(currentImage.getImageUrl());
+
+                // Eliminar de la propiedad
+                property.removeImage(currentImage);
+            }
+        }
+
+        // Agregar nuevas imágenes
+        List<String> existingUrls = property.getImages().stream()
+                .map(PropertyImage::getImageUrl)
+                .collect(Collectors.toList());
+
+        for (int i = 0; i < newImageUrls.size(); i++) {
+            String imageUrl = newImageUrls.get(i);
+
+            if (!existingUrls.contains(imageUrl)) {
+                PropertyImage newImage = PropertyImage.builder()
+                        .property(property)
+                        .imageUrl(imageUrl)
+                        .imagePublicId(extractPublicIdFromUrl(imageUrl))
+                        .displayOrder(i)
+                        .isMain(i == 0 && property.getImages().isEmpty())
+                        .createdBy(getCurrentUser().getId())
+                        .build();
+
+                property.addImage(newImage);
+            }
+        }
+
+        // Actualizar orden de visualización de todas las imágenes
+        List<PropertyImage> sortedImages = property.getImages().stream()
+                .sorted((a, b) -> {
+                    int indexA = newImageUrls.indexOf(a.getImageUrl());
+                    int indexB = newImageUrls.indexOf(b.getImageUrl());
+                    return Integer.compare(indexA, indexB);
+                })
+                .collect(Collectors.toList());
+
+        for (int i = 0; i < sortedImages.size(); i++) {
+            sortedImages.get(i).setDisplayOrder(i);
+            sortedImages.get(i).setIsMain(i == 0);
+        }
+    }
+
+    private void deleteImageFromCloudinary(String imageUrl) {
+        try {
+            String publicId = extractPublicIdFromUrl(imageUrl);
+            if (publicId != null && !publicId.isEmpty()) {
+                cloudinaryService.deleteImage(publicId);
+                log.info("Deleted image from Cloudinary - publicId: {}", publicId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to delete image from Cloudinary - url: {}, error: {}",
+                    imageUrl, e.getMessage());
+        }
+    }
+
+    private int getMaxImagesForPlan(String plan) {
+        switch (plan) {
+            case "BASICO":
+                return 3;
+            case "INTERMEDIO":
+                return 5;
+            case "SUPERIOR":
+                return 10;
+            default:
+                return 3;
+        }
+    }
+
+    private String extractPublicIdFromUrl(String imageUrl) {
+        if (imageUrl == null || !imageUrl.contains("cloudinary.com")) {
+            return null;
+        }
+
+        try {
+            String[] parts = imageUrl.split("/upload/");
+            if (parts.length < 2) return null;
+
+            String afterUpload = parts[1].replaceFirst("v\\d+/", "");
+            int lastDot = afterUpload.lastIndexOf('.');
+            return lastDot > 0 ? afterUpload.substring(0, lastDot) : afterUpload;
+        } catch (Exception e) {
+            log.warn("Error extracting public ID from URL: {}", imageUrl);
+            return null;
+        }
+    }
+
     private PropertyResponse mapToResponse(Property property) {
+        PropertyImage mainImage = property.getMainImage();
         return PropertyResponse.builder()
                 .id(property.getId())
                 .propertyCode(property.getPropertyCode())
@@ -497,6 +638,7 @@ public class PropertyServiceImpl implements PropertyService {
                 .totalAreaM2(property.getTotalAreaM2())
                 .isActive(property.getIsActive())
                 .createdAt(property.getCreatedAt())
+                .mainImageUrl(mainImage != null ? mainImage.getImageUrl() : null)
                 .build();
     }
 
@@ -542,6 +684,10 @@ public class PropertyServiceImpl implements PropertyService {
                 .createdAt(property.getCreatedAt())
                 .updatedAt(property.getUpdatedAt())
                 .createdBy(property.getCreatedBy())
+                .imageUrls(property.getImages().stream()
+                        .sorted((a, b) -> Integer.compare(a.getDisplayOrder(), b.getDisplayOrder()))
+                        .map(PropertyImage::getImageUrl)
+                        .collect(Collectors.toList()))
                 .build();
     }
 }

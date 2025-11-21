@@ -30,4 +30,5 @@ public class PropertyResponse {
     private BigDecimal totalAreaM2;
     private Boolean isActive;
     private LocalDateTime createdAt;
+    private String mainImageUrl;
 }

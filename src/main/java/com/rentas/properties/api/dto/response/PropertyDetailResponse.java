@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -44,6 +45,7 @@ public class PropertyDetailResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private UUID createdBy;
+    private List<String> imageUrls;
 
     @Data
     @Builder

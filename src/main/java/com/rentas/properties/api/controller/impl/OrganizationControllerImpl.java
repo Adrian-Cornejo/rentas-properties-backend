@@ -4,6 +4,7 @@ import com.rentas.properties.api.controller.OrganizationController;
 import com.rentas.properties.api.dto.request.CreateOrganizationRequest;
 import com.rentas.properties.api.dto.request.UpdateOrganizationRequest;
 import com.rentas.properties.api.dto.response.OrganizationDetailResponse;
+import com.rentas.properties.api.dto.response.OrganizationInfoResponse;
 import com.rentas.properties.api.dto.response.OrganizationResponse;
 import com.rentas.properties.api.dto.response.OrganizationStatsResponse;
 import com.rentas.properties.business.services.OrganizationService;
@@ -131,5 +132,13 @@ public class OrganizationControllerImpl implements OrganizationController {
         List<OrganizationResponse> organizations = organizationService.getActiveOrganizations();
         log.info("Se encontraron {} organizaciones activas", organizations.size());
         return ResponseEntity.ok(organizations);
+    }
+
+    @Override
+    @GetMapping("/me/info")
+    public ResponseEntity<OrganizationInfoResponse> getMyOrganizationInfo() {
+        log.info("Obteniendo información básica de organización del usuario");
+        OrganizationInfoResponse response = organizationService.getMyOrganizationInfo();
+        return ResponseEntity.ok(response);
     }
 }

@@ -3,6 +3,7 @@ package com.rentas.properties.api.controller;
 import com.rentas.properties.api.dto.request.CreateOrganizationRequest;
 import com.rentas.properties.api.dto.request.UpdateOrganizationRequest;
 import com.rentas.properties.api.dto.response.OrganizationDetailResponse;
+import com.rentas.properties.api.dto.response.OrganizationInfoResponse;
 import com.rentas.properties.api.dto.response.OrganizationResponse;
 import com.rentas.properties.api.dto.response.OrganizationStatsResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -182,4 +183,18 @@ public interface OrganizationController {
             )
     })
     ResponseEntity<List<OrganizationResponse>> getActiveOrganizations();
+
+    @Operation(
+            summary = "Get current user's organization info",
+            description = "Returns basic organization information for the authenticated user"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Organization info retrieved successfully",
+                    content = @Content(schema = @Schema(implementation = OrganizationInfoResponse.class))
+            ),
+            @ApiResponse(responseCode = "404", description = "User has no organization assigned")
+    })
+    ResponseEntity<OrganizationInfoResponse> getMyOrganizationInfo();
 }
