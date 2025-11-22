@@ -4,11 +4,11 @@ import com.rentas.properties.api.dto.request.LoginRequest;
 import com.rentas.properties.api.dto.request.RefreshTokenRequest;
 import com.rentas.properties.api.dto.request.RegisterRequest;
 import com.rentas.properties.api.dto.response.AuthResponse;
-import com.rentas.properties.api.exception.EmailAlreadyExistsException;
-import com.rentas.properties.api.exception.InvalidTokenException;
-import com.rentas.properties.api.exception.UserNotFoundException;
+import com.rentas.properties.api.exception.*;
 import com.rentas.properties.business.services.AuthService;
+import com.rentas.properties.dao.entity.Organization;
 import com.rentas.properties.dao.entity.User;
+import com.rentas.properties.dao.repository.OrganizationRepository;
 import com.rentas.properties.dao.repository.UserRepository;
 import com.rentas.properties.security.jwt.JwtService;
 import com.rentas.properties.security.service.UserDetailsImpl;
@@ -38,6 +38,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final UserDetailsService userDetailsService;
+    private final OrganizationRepository organizationRepository;
 
 
     private final Set<String> blacklistedTokens = ConcurrentHashMap.newKeySet();
@@ -54,6 +55,26 @@ public class AuthServiceImpl implements AuthService {
             );
         }
 
+        Organization organization = null;
+
+        if (request.getInvitationCode() != null && !request.getInvitationCode().isBlank()) {
+            log.info("Registro con código de invitación: {}", request.getInvitationCode());
+
+            organization = organizationRepository.findByInvitationCode(request.getInvitationCode())
+                    .orElseThrow(() -> new InvitationCodeInvalidException(
+                            "Código de invitación inválido: " + request.getInvitationCode()
+                    ));
+
+            if (!organization.getIsActive()) {
+                throw new OrganizationNotActiveException("La organización no está activa");
+            }
+
+            if (organization.getCurrentUsersCount() >= organization.getMaxUsers()) {
+                throw new OrganizationUserLimitException(
+                        "La organización alcanzó el límite máximo de usuarios (" + organization.getMaxUsers() + ")"
+                );
+            }
+        }
 
         String role = request.getRole() != null && !request.getRole().isEmpty()
                 ? request.getRole().toUpperCase()
@@ -68,10 +89,21 @@ public class AuthServiceImpl implements AuthService {
                 .fullName(request.getFullName())
                 .phone(request.getPhone())
                 .role(role)
+                .organization(organization)
+                .organizationJoinedAt(organization != null ? LocalDateTime.now() : null)
+
                 .isActive(true)
                 .build();
 
         User savedUser = userRepository.save(user);
+
+        if (organization != null) {
+            organization.setCurrentUsersCount(organization.getCurrentUsersCount() + 1);
+            organizationRepository.save(organization);
+            log.info("Usuario {} unido a organización {} durante registro",
+                    savedUser.getEmail(), organization.getName());
+        }
+
         log.info("Usuario creado exitosamente con ID: {}", savedUser.getId());
 
         UserDetailsImpl userDetails = UserDetailsImpl.build(savedUser);
@@ -203,6 +235,9 @@ public class AuthServiceImpl implements AuthService {
                 .role(user.getRole())
                 .isActive(user.getIsActive())
                 .lastLogin(user.getLastLogin())
+                .hasOrganization(user.hasOrganization())
+                .organizationId(user.getOrganizationId())
+                .organizationName(user.getOrganizationName())
                 .build();
 
         return AuthResponse.builder()

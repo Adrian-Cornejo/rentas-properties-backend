@@ -33,5 +33,8 @@ public class AuthResponse {
         private String role;
         private Boolean isActive;
         private LocalDateTime lastLogin;
+        private Boolean hasOrganization;
+        private UUID organizationId;
+        private String organizationName;
     }
 }

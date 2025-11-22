@@ -38,5 +38,13 @@ public class RegisterRequest {
     )
     private String phone;
 
-    private String role; // Opcional, por defecto será USER
+    private String role;
+
+    @Pattern(
+            regexp = "^[A-Z]{3}-[A-Z0-9]{2}[A-Z][0-9]$",
+            message = "El código de invitación debe tener el formato ABC-12D3"
+    )
+    @Size(max = 8)
+    private String invitationCode;
+
 }
