@@ -99,4 +99,13 @@ public class TenantControllerImpl implements TenantController {
         log.info("Se encontraron {} arrendatarios activos", tenants.size());
         return ResponseEntity.ok(tenants);
     }
+
+    @Override
+    @DeleteMapping("/{id}/ine-image")
+    public ResponseEntity<Void> deleteTenantIneImage(@PathVariable UUID id) {
+        log.info("Eliminando imagen de INE del arrendatario con ID: {}", id);
+        tenantService.deleteTenantIneImage(id);
+        log.info("Imagen de INE eliminada exitosamente");
+        return ResponseEntity.ok().build();
+    }
 }
