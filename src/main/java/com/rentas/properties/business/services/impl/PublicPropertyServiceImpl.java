@@ -62,6 +62,7 @@ public class PublicPropertyServiceImpl implements PublicPropertyService {
                 .propertyType(property.getPropertyType())
                 .address(property.getAddress())
                 .monthlyRent(property.getMonthlyRent())
+                .floors(property.getFloors())
                 .waterFee(property.getWaterFee())
                 .bedrooms(property.getBedrooms())
                 .bathrooms(property.getBathrooms())

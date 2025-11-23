@@ -26,6 +26,9 @@ public class PublicPropertyResponse {
     @Schema(description = "Tipo de propiedad", example = "CASA")
     private String propertyType;
 
+    @Schema(description = "Numero de pisos", example = "1")
+    private  Integer floors;
+
     @Schema(description = "Dirección completa")
     private String address;
 
