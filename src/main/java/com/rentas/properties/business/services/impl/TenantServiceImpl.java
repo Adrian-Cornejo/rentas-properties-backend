@@ -8,6 +8,7 @@ import com.rentas.properties.api.exception.TenantAlreadyExistsException;
 import com.rentas.properties.api.exception.TenantHasActiveContractsException;
 import com.rentas.properties.api.exception.TenantNotFoundException;
 import com.rentas.properties.api.exception.UnauthorizedAccessException;
+import com.rentas.properties.business.services.CloudinaryService;
 import com.rentas.properties.business.services.TenantService;
 import com.rentas.properties.dao.entity.Organization;
 import com.rentas.properties.dao.entity.Tenant;
@@ -32,6 +33,7 @@ public class TenantServiceImpl implements TenantService {
 
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
+    private final CloudinaryService cloudinaryService;
 
     @Override
     @Transactional
@@ -129,48 +131,46 @@ public class TenantServiceImpl implements TenantService {
         User currentUser = getCurrentUser();
         validateUserCanAccessTenant(currentUser, tenant);
 
+        // Si hay nueva imagen y es diferente a la anterior, eliminar la antigua
+        if (request.getInePublicId() != null &&
+                !request.getInePublicId().equals(tenant.getInePublicId()) &&
+                tenant.getInePublicId() != null && !tenant.getInePublicId().isEmpty()) {
+            try {
+                cloudinaryService.deleteImage(tenant.getInePublicId());
+                log.info("Imagen anterior eliminada de Cloudinary - publicId: {}", tenant.getInePublicId());
+            } catch (Exception e) {
+                log.warn("Error al eliminar imagen anterior de Cloudinary: {}", e.getMessage());
+            }
+        }
+
+        // Actualizar campos
         if (request.getFullName() != null) {
             tenant.setFullName(request.getFullName());
         }
-
-        if (request.getPhone() != null && !request.getPhone().equals(tenant.getPhone())) {
-            if (tenantRepository.existsByPhoneAndOrganization_Id(
-                    request.getPhone(), tenant.getOrganization().getId())) {
+        if (request.getPhone() != null) {
+            if (!request.getPhone().equals(tenant.getPhone()) &&
+                    tenantRepository.existsByPhoneAndOrganization_Id(request.getPhone(), tenant.getOrganization().getId())) {
                 throw new TenantAlreadyExistsException(
                         "Ya existe un arrendatario con el teléfono '" + request.getPhone() + "' en tu organización"
                 );
             }
             tenant.setPhone(request.getPhone());
         }
-
         if (request.getEmail() != null) {
-            if (!request.getEmail().isEmpty() && !request.getEmail().equals(tenant.getEmail())) {
-                if (tenantRepository.existsByEmailAndOrganization_Id(
-                        request.getEmail(), tenant.getOrganization().getId())) {
-                    throw new TenantAlreadyExistsException(
-                            "Ya existe un arrendatario con el email '" + request.getEmail() + "' en tu organización"
-                    );
-                }
-            }
             tenant.setEmail(request.getEmail());
         }
-
         if (request.getIneNumber() != null) {
             tenant.setIneNumber(request.getIneNumber());
         }
-
         if (request.getIneImageUrl() != null) {
             tenant.setIneImageUrl(request.getIneImageUrl());
         }
-
         if (request.getInePublicId() != null) {
             tenant.setInePublicId(request.getInePublicId());
         }
-
         if (request.getNumberOfOccupants() != null) {
             tenant.setNumberOfOccupants(request.getNumberOfOccupants());
         }
-
         if (request.getNotes() != null) {
             tenant.setNotes(request.getNotes());
         }
@@ -199,6 +199,16 @@ public class TenantServiceImpl implements TenantService {
             throw new TenantHasActiveContractsException(
                     "No se puede eliminar el arrendatario porque tiene " + activeContractsCount + " contratos activos"
             );
+        }
+
+        // Eliminar imagen de Cloudinary si existe
+        if (tenant.getInePublicId() != null && !tenant.getInePublicId().isEmpty()) {
+            try {
+                cloudinaryService.deleteImage(tenant.getInePublicId());
+                log.info("Imagen de INE eliminada de Cloudinary - publicId: {}", tenant.getInePublicId());
+            } catch (Exception e) {
+                log.warn("Error al eliminar imagen de Cloudinary: {}", e.getMessage());
+            }
         }
 
         tenant.setIsActive(false);
@@ -264,6 +274,37 @@ public class TenantServiceImpl implements TenantService {
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    @Transactional
+    public void deleteTenantIneImage(UUID tenantId) {
+        log.info("Eliminando imagen de INE del arrendatario con ID: {}", tenantId);
+
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new TenantNotFoundException("Arrendatario no encontrado con ID: " + tenantId));
+
+        User currentUser = getCurrentUser();
+        validateUserCanAccessTenant(currentUser, tenant);
+
+        // Eliminar de Cloudinary si existe
+        if (tenant.getInePublicId() != null && !tenant.getInePublicId().isEmpty()) {
+            try {
+                cloudinaryService.deleteImage(tenant.getInePublicId());
+                log.info("Imagen eliminada de Cloudinary - publicId: {}", tenant.getInePublicId());
+            } catch (Exception e) {
+                log.warn("Error al eliminar imagen de Cloudinary: {}", e.getMessage());
+            }
+        }
+
+        // Limpiar campos de imagen en la entidad
+        tenant.setIneImageUrl(null);
+        tenant.setInePublicId(null);
+        tenant.setIneNumber(null);
+        tenantRepository.save(tenant);
+
+        log.info("Imagen de INE eliminada exitosamente del arrendatario: {}", tenantId);
+    }
+
 
     private User getCurrentUser() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();

@@ -25,4 +25,6 @@ public interface TenantService {
     TenantDetailResponse getTenantByPhone(String phone);
 
     List<TenantResponse> getActiveTenants();
+
+    void deleteTenantIneImage(UUID tenantId);
 }

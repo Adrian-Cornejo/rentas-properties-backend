@@ -139,4 +139,15 @@ public interface TenantController {
             )
     })
     ResponseEntity<List<TenantResponse>> getActiveTenants();
+
+    @Operation(
+            summary = "Eliminar imagen de INE",
+            description = "Elimina la imagen de INE del arrendatario"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Imagen eliminada exitosamente"),
+            @ApiResponse(responseCode = "404", description = "Arrendatario no encontrado"),
+            @ApiResponse(responseCode = "403", description = "No tienes acceso a este arrendatario")
+    })
+    ResponseEntity<Void> deleteTenantIneImage(@PathVariable UUID id);
 }
