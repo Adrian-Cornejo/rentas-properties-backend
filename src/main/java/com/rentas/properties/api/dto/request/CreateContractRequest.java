@@ -1,5 +1,6 @@
 package com.rentas.properties.api.dto.request;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,24 +21,15 @@ public class CreateContractRequest {
     @NotNull(message = "El ID de la propiedad es obligatorio")
     private UUID propertyId;
 
-    @NotNull(message = "Se requiere al menos un arrendatario")
-    @Size(min = 1, message = "Debe haber al menos un arrendatario en el contrato")
-    private List<UUID> tenantIds;
-
-    @NotBlank(message = "El número de contrato es obligatorio")
-    @Size(max = 50, message = "El número de contrato no debe exceder 50 caracteres")
-    @Pattern(
-            regexp = "^CONT-[0-9]{4}-[0-9]{3}$",
-            message = "El número de contrato debe tener el formato CONT-2024-001"
-    )
-    private String contractNumber;
+    @NotNull(message = "Se requiere al menos un inquilino")
+    @Size(min = 1, message = "Debe haber al menos un inquilino en el contrato")
+    @Valid
+    private List<TenantAssignmentDto> tenants;
 
     @NotNull(message = "La fecha de inicio es obligatoria")
-    @FutureOrPresent(message = "La fecha de inicio debe ser hoy o en el futuro")
     private LocalDate startDate;
 
     @NotNull(message = "La fecha de fin es obligatoria")
-    @Future(message = "La fecha de fin debe ser en el futuro")
     private LocalDate endDate;
 
     private LocalDate signedDate;
@@ -47,12 +39,12 @@ public class CreateContractRequest {
     @Digits(integer = 10, fraction = 2, message = "Formato de renta mensual inválido")
     private BigDecimal monthlyRent;
 
+    @NotNull(message = "El costo de agua es obligatorio")
     @DecimalMin(value = "0.00", message = "El costo del agua no puede ser negativo")
     @Digits(integer = 10, fraction = 2, message = "Formato de costo de agua inválido")
     private BigDecimal waterFee;
 
-    @NotNull(message = "El monto del adelanto es obligatorio")
-    @DecimalMin(value = "0.01", message = "El adelanto debe ser mayor a 0")
+    @DecimalMin(value = "0.00", message = "El adelanto no puede ser negativo")
     @Digits(integer = 10, fraction = 2, message = "Formato de adelanto inválido")
     private BigDecimal advancePayment;
 
@@ -60,6 +52,14 @@ public class CreateContractRequest {
     @DecimalMin(value = "0.01", message = "El depósito debe ser mayor a 0")
     @Digits(integer = 10, fraction = 2, message = "Formato de depósito inválido")
     private BigDecimal depositAmount;
+
+    private Boolean depositPaid;
+
+    private LocalDate depositPaymentDeadline;
+
+    private String contractDocumentUrl;
+
+    private String contractDocumentPublicId;
 
     @Size(max = 2000, message = "Las notas no deben exceder 2000 caracteres")
     private String notes;

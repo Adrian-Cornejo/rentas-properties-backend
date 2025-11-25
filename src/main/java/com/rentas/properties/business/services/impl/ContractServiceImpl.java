@@ -1,6 +1,7 @@
 package com.rentas.properties.business.services.impl;
 
 import com.rentas.properties.api.dto.request.CreateContractRequest;
+import com.rentas.properties.api.dto.request.TenantAssignmentDto;
 import com.rentas.properties.api.dto.request.UpdateContractRequest;
 import com.rentas.properties.api.dto.request.UpdateDepositStatusRequest;
 import com.rentas.properties.api.dto.response.ContractDetailResponse;
@@ -10,6 +11,7 @@ import com.rentas.properties.api.exception.*;
 import com.rentas.properties.business.services.ContractService;
 import com.rentas.properties.dao.entity.*;
 import com.rentas.properties.dao.repository.*;
+import jakarta.validation.ValidationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -45,14 +47,12 @@ public class ContractServiceImpl implements ContractService {
 
         Organization organization = currentUser.getOrganization();
 
-        // Validar que la propiedad existe y pertenece a la organización
         Property property = propertyRepository.findById(request.getPropertyId())
                 .orElseThrow(() -> new PropertyNotFoundException(
                         "Propiedad no encontrada con ID: " + request.getPropertyId()));
 
         validateUserCanAccessProperty(currentUser, property);
 
-        // Validar que la propiedad está disponible
         if (!"DISPONIBLE".equals(property.getStatus())) {
             log.warn("Intento de crear contrato para propiedad {} que no está disponible. Estado actual: {}",
                     property.getId(), property.getStatus());
@@ -60,48 +60,57 @@ public class ContractServiceImpl implements ContractService {
                     "La propiedad no está disponible para renta. Estado actual: " + property.getStatus());
         }
 
-        // Validar que todos los arrendatarios existen y pertenecen a la organización
-        validateTenantsExistAndBelongToOrganization(request.getTenantIds(), organization.getId());
+        validateTenantsExistAndBelongToOrganization(request.getTenants(), organization.getId());
 
-        // Validar que el número de contrato no existe
-        if (contractRepository.existsByContractNumber(request.getContractNumber())) {
-            log.warn("Ya existe un contrato con el número: {}", request.getContractNumber());
-            throw new ContractAlreadyExistsException(
-                    "Ya existe un contrato con el número: " + request.getContractNumber());
+        validatePrimaryTenant(request.getTenants());
+
+        String contractNumber = generateContractNumber(organization.getId());
+
+        if (request.getEndDate().isBefore(request.getStartDate())) {
+            throw new InvalidContractDatesException("La fecha de fin debe ser posterior a la fecha de inicio");
         }
 
-        // Crear el contrato
+        BigDecimal advancePayment = request.getAdvancePayment() != null
+                ? request.getAdvancePayment()
+                : BigDecimal.ZERO;
+
+        Boolean depositPaid = request.getDepositPaid() != null
+                ? request.getDepositPaid()
+                : false;
+
         Contract contract = Contract.builder()
                 .organization(organization)
                 .property(property)
-                .contractNumber(request.getContractNumber())
+                .contractNumber(contractNumber)
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
-                .signedDate(request.getSignedDate())
+                .signedDate(request.getSignedDate() != null ? request.getSignedDate() : LocalDate.now())
                 .monthlyRent(request.getMonthlyRent())
-                .waterFee(request.getWaterFee() != null ? request.getWaterFee() : BigDecimal.valueOf(105.00))
-                .advancePayment(request.getAdvancePayment())
+                .waterFee(request.getWaterFee())
+                .advancePayment(advancePayment)
                 .depositAmount(request.getDepositAmount())
-                .depositPaid(false)
-                .depositPaymentDeadline(request.getStartDate().plusDays(15))
-                .depositStatus("PENDIENTE")
+                .depositPaid(depositPaid)
+                .depositPaymentDeadline(request.getDepositPaymentDeadline())
+                .depositStatus(depositPaid ? "PAGADO" : "PENDIENTE")
                 .status("ACTIVO")
+                .contractDocumentUrl(request.getContractDocumentUrl())
+                .contractDocumentPublicId(request.getContractDocumentPublicId())
                 .notes(request.getNotes())
                 .isActive(true)
                 .build();
 
         Contract savedContract = contractRepository.save(contract);
-        log.info("Contrato creado con ID: {}", savedContract.getId());
+        log.info("Contrato creado con ID: {} - Número: {}", savedContract.getId(), savedContract.getContractNumber());
 
-        // Asociar arrendatarios al contrato
-        associateTenantsToContract(savedContract, request.getTenantIds());
+        // Asociar inquilinos al contrato con su información completa
+        associateTenantsToContractWithDetails(savedContract, request.getTenants());
 
         // Cambiar estado de la propiedad a RENTADA
         property.setStatus("RENTADA");
         propertyRepository.save(property);
-        log.info("Propiedad {} cambiada a estado RENTADA", property.getId());
+        log.info("Estado de propiedad {} cambiado a RENTADA", property.getId());
 
-        // Generar pagos automáticos (6 meses)
+        // Generar pagos automáticos
         generateAutomaticPayments(savedContract);
 
         return mapToDetailResponse(savedContract);
@@ -173,7 +182,6 @@ public class ContractServiceImpl implements ContractService {
         User currentUser = getCurrentUser();
         validateUserCanAccessContract(currentUser, contract);
 
-        // Actualizar campos si están presentes
         if (request.getSignedDate() != null) {
             contract.setSignedDate(request.getSignedDate());
         }
@@ -556,15 +564,15 @@ public class ContractServiceImpl implements ContractService {
         }
     }
 
-    private void validateTenantsExistAndBelongToOrganization(List<UUID> tenantIds, UUID organizationId) {
-        for (UUID tenantId : tenantIds) {
-            Tenant tenant = tenantRepository.findById(tenantId)
+    private void validateTenantsExistAndBelongToOrganization(List<TenantAssignmentDto> tenants, UUID organizationId) {
+        for (TenantAssignmentDto tenantDto : tenants) {
+            Tenant tenant = tenantRepository.findById(tenantDto.getTenantId())
                     .orElseThrow(() -> new TenantNotFoundException(
-                            "Arrendatario no encontrado con ID: " + tenantId));
+                            "Inquilino no encontrado con ID: " + tenantDto.getTenantId()));
 
             if (!tenant.getOrganization().getId().equals(organizationId)) {
                 throw new UnauthorizedAccessException(
-                        "El arrendatario con ID " + tenantId + " no pertenece a tu organización");
+                        "El inquilino con ID " + tenantDto.getTenantId() + " no pertenece a tu organización");
             }
         }
     }
@@ -670,6 +678,54 @@ public class ContractServiceImpl implements ContractService {
         }
     }
 
+    private String generateContractNumber(UUID organizationId) {
+        int currentYear = LocalDate.now().getYear();
+
+
+        List<Contract> contractsThisYear = contractRepository.findByOrganization_Id(organizationId).stream()
+                .filter(c -> c.getCreatedAt().getYear() == currentYear)
+                .collect(Collectors.toList());
+
+        int nextNumber = contractsThisYear.size() + 1;
+
+        return String.format("CONT-%d-%03d", currentYear, nextNumber);
+    }
+
+    private void validatePrimaryTenant(List<TenantAssignmentDto> tenants) {
+        long primaryCount = tenants.stream()
+                .filter(TenantAssignmentDto::getIsPrimary)
+                .count();
+
+        if (primaryCount == 0) {
+            throw new ValidationException("Debe haber exactamente un inquilino principal");
+        }
+
+        if (primaryCount > 1) {
+            throw new ValidationException("Solo puede haber un inquilino principal");
+        }
+    }
+
+    private void associateTenantsToContractWithDetails(Contract contract, List<TenantAssignmentDto> tenants) {
+        log.info("Asociando {} inquilinos al contrato {}", tenants.size(), contract.getId());
+
+        for (TenantAssignmentDto tenantDto : tenants) {
+            Tenant tenant = tenantRepository.findById(tenantDto.getTenantId())
+                    .orElseThrow(() -> new TenantNotFoundException(
+                            "Inquilino no encontrado con ID: " + tenantDto.getTenantId()));
+
+            ContractTenant contractTenant = ContractTenant.builder()
+                    .contract(contract)
+                    .tenant(tenant)
+                    .isPrimary(tenantDto.getIsPrimary())
+                    .relationship(tenantDto.getRelationship())
+                    .build();
+
+            contractTenantRepository.save(contractTenant);
+        }
+
+        log.info("Inquilinos asociados exitosamente");
+    }
+
     private ContractResponse mapToResponse(Contract contract) {
         // Obtener nombres de arrendatarios
         String tenantNames = contract.getContractTenants().stream()
@@ -698,7 +754,6 @@ public class ContractServiceImpl implements ContractService {
     }
 
     private ContractDetailResponse mapToDetailResponse(Contract contract) {
-        // Mapear información de la propiedad
         Property property = contract.getProperty();
         ContractDetailResponse.PropertyDto propertyDto = ContractDetailResponse.PropertyDto.builder()
                 .id(property.getId())
@@ -708,7 +763,6 @@ public class ContractServiceImpl implements ContractService {
                 .status(property.getStatus())
                 .build();
 
-        // Mapear arrendatarios
         List<ContractDetailResponse.TenantDto> tenantDtos = contract.getContractTenants().stream()
                 .map(ct -> ContractDetailResponse.TenantDto.builder()
                         .id(ct.getTenant().getId())
