@@ -52,4 +52,10 @@ public interface ContractRepository extends JpaRepository<Contract, UUID> {
     @Query("SELECT c FROM Contract c WHERE c.organization.id = :organizationId " +
             "AND c.depositPaid = false AND c.status = 'ACTIVO'")
     List<Contract> findContractsWithPendingDepositByOrganization(@Param("organizationId") UUID organizationId);
+
+    @Query("SELECT COUNT(c) FROM Contract c WHERE c.organization.id = :organizationId AND c.status = :status")
+    Integer countByOrganization_IdAndStatus(
+            @Param("organizationId") UUID organizationId,
+            @Param("status") String status
+    );
 }

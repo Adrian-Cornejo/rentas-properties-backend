@@ -70,4 +70,13 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
             @Param("year") Integer year,
             @Param("month") Integer month
     );
+
+    @Query("SELECT p FROM Payment p " +
+            "WHERE p.dueDate = :dueDate " +
+            "AND p.contract.organization.id = :organizationId " +
+            "AND p.status IN ('PENDIENTE', 'ATRASADO')")
+    List<Payment> findByDueDateAndOrganization(
+            @Param("dueDate") LocalDate dueDate,
+            @Param("organizationId") UUID organizationId
+    );
 }

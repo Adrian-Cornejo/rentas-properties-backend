@@ -364,4 +364,55 @@ public class GlobalExceptionHandler {
                 .build();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
+
+    @ExceptionHandler(NotificationLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleNotificationLimitExceededException(
+            NotificationLimitExceededException ex,
+            HttpServletRequest request) {
+        log.warn("Límite de notificaciones excedido: {}", ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.TOO_MANY_REQUESTS.value())
+                .error("Too Many Requests")
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(error);
+    }
+
+    @ExceptionHandler(InvalidPhoneNumberException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidPhoneNumberException(
+            InvalidPhoneNumberException ex,
+            HttpServletRequest request) {
+        log.warn("Número de teléfono inválido: {}", ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Bad Request")
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(NotificationProviderException.class)
+    public ResponseEntity<ErrorResponse> handleNotificationProviderException(
+            NotificationProviderException ex,
+            HttpServletRequest request) {
+        log.error("Error en proveedor de notificaciones: {}", ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.SERVICE_UNAVAILABLE.value())
+                .error("Service Unavailable")
+                .message("El servicio de notificaciones no está disponible temporalmente. " + ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
+    }
 }
