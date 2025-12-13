@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -130,6 +131,24 @@ public class Organization {
     @Column(name = "created_by")
     private UUID createdBy;
 
+    @Column(name = "notification_enabled")
+    private Boolean notificationEnabled;
+
+    @Column(name = "notification_channel", length = 20)
+    private String notificationChannel; // SMS, WHATSAPP, BOTH
+
+    @Column(name = "notifications_sent_this_month")
+    private Integer notificationsSentThisMonth;
+
+    @Column(name = "notification_limit")
+    private Integer notificationLimit;
+
+    @Column(name = "last_notification_reset")
+    private LocalDate lastNotificationReset;
+
+    @Column(name = "admin_notifications")
+    private Boolean adminNotifications;
+
     // Relaciones
     @OneToMany(mappedBy = "organization", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
@@ -161,6 +180,19 @@ public class Organization {
             createdAt = LocalDateTime.now();
         }
         updatedAt = LocalDateTime.now();
+
+        if (notificationEnabled == null) {
+            notificationEnabled = false;
+        }
+        if (notificationsSentThisMonth == null) {
+            notificationsSentThisMonth = 0;
+        }
+        if (notificationLimit == null) {
+            notificationLimit = 0;
+        }
+        if (adminNotifications == null) {
+            adminNotifications = true;
+        }
     }
 
     @PreUpdate
@@ -258,6 +290,7 @@ public class Organization {
         }
         return 0;
     }
+
 
     public String getOwnerName() {
         return owner != null ? owner.getFullName() : "Sin dueño";

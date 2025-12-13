@@ -92,6 +92,9 @@ dependencies {
     // Twilio - SMS y WhatsApp
     implementation 'com.twilio.sdk:twilio:10.0.0'
 
+    implementation platform('software.amazon.awssdk:bom:2.20.0')
+    implementation 'software.amazon.awssdk:sns'
+
     // ============================================
     // DOCUMENTATION - SWAGGER/OPENAPI
     // ============================================
