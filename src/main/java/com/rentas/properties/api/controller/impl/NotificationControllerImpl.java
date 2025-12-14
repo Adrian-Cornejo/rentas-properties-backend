@@ -30,7 +30,6 @@ public class NotificationControllerImpl implements NotificationController {
 
     @Override
     @GetMapping("/settings")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER', 'VIEWER')")
     public ResponseEntity<NotificationSettingsResponse> getNotificationSettings() {
         log.info("Solicitando configuración de notificaciones");
         return ResponseEntity.ok(notificationService.getSettings());
@@ -38,7 +37,6 @@ public class NotificationControllerImpl implements NotificationController {
 
     @Override
     @PutMapping("/settings")
-    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<NotificationSettingsResponse> updateNotificationSettings(
             @Valid @RequestBody NotificationSettingsRequest request) {
         log.info("Actualizando configuración de notificaciones: {}", request);
@@ -47,7 +45,6 @@ public class NotificationControllerImpl implements NotificationController {
 
     @Override
     @PostMapping("/test")
-    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Map<String, String>> sendTestNotification(
             @Valid @RequestBody SendTestNotificationRequest request) {
         log.info("Enviando notificación de prueba a {}", request.getPhoneNumber());
@@ -63,7 +60,6 @@ public class NotificationControllerImpl implements NotificationController {
 
     @Override
     @GetMapping("/stats")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER')")
     public ResponseEntity<NotificationStatsResponse> getNotificationStats() {
         log.info("Solicitando estadísticas de notificaciones");
         return ResponseEntity.ok(notificationService.getStats());
