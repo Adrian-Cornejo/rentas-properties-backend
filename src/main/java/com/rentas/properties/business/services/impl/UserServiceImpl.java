@@ -365,7 +365,7 @@ public class UserServiceImpl implements UserService {
                     .id(org.getId())
                     .name(org.getName())
                     .invitationCode(org.getInvitationCode())
-                    .subscriptionPlan(org.getSubscriptionPlan())
+                    .subscriptionPlan(org.getPlanCode())
                     .subscriptionStatus(org.getSubscriptionStatus())
                     .build();
         }

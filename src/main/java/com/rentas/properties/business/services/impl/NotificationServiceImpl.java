@@ -87,8 +87,8 @@ public class NotificationServiceImpl {
             return;
         }
 
-        String channel = org.getNotificationChannel();
-        String plan = org.getSubscriptionPlan();
+        String channel = org.getNotificationChannels();
+        SubscriptionPlan plan = org.getSubscriptionPlan();
 
         // Obtener pagos que requieren notificación
         List<Payment> paymentsToNotify = new ArrayList<>();
@@ -437,12 +437,12 @@ public class NotificationServiceImpl {
 
         return NotificationSettingsResponse.builder()
                 .enabled(org.getNotificationEnabled())
-                .channel(org.getNotificationChannel())
+                .channel(org.getNotificationChannels())
                 .adminNotifications(org.getAdminNotifications())
                 .sentThisMonth(org.getNotificationsSentThisMonth())
                 .monthlyLimit(org.getNotificationLimit())
                 .remainingCredits(remaining)
-                .subscriptionPlan(org.getSubscriptionPlan())
+                .subscriptionPlan(org.getPlanCode())
                 .build();
     }
 
@@ -453,7 +453,7 @@ public class NotificationServiceImpl {
         validateUserIsAdmin(currentUser);
 
         Organization org = currentUser.getOrganization();
-        String plan = org.getSubscriptionPlan();
+        String plan = org.getPlanCode();
 
         // Validar según plan
         if ("BASICO".equals(plan) && request.getEnabled()) {
@@ -470,7 +470,7 @@ public class NotificationServiceImpl {
         int limit = calculateNotificationLimit(org);
 
         org.setNotificationEnabled(request.getEnabled());
-        org.setNotificationChannel(request.getChannel());
+        org.setNotificationChannels(request.getChannel());
         org.setAdminNotifications(request.getAdminNotifications() != null ? request.getAdminNotifications() : true);
         org.setNotificationLimit(limit);
 
@@ -486,7 +486,7 @@ public class NotificationServiceImpl {
     }
 
     private int calculateNotificationLimit(Organization org) {
-        String plan = org.getSubscriptionPlan();
+        String plan = org.getPlanCode();
 
         if ("BASICO".equals(plan)) {
             return 0;

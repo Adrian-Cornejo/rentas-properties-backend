@@ -69,7 +69,6 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .currentUsersCount(1)
                 .currentPropertiesCount(0)
                 .subscriptionStatus("TRIAL")
-                .subscriptionPlan("BASIC")
                 .trialEndsAt(trialEndsAt)
                 .isActive(true)
                 .createdAt(now)
@@ -193,9 +192,6 @@ public class OrganizationServiceImpl implements OrganizationService {
                 organization.setSubscriptionStatus(request.getSubscriptionStatus());
             }
 
-            if (request.getSubscriptionPlan() != null) {
-                organization.setSubscriptionPlan(request.getSubscriptionPlan());
-            }
         }
 
         Organization updatedOrganization = organizationRepository.save(organization);
@@ -295,7 +291,6 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .propertiesAvailable(organization.getMaxProperties() - organization.getCurrentPropertiesCount())
                 .propertiesPercentage(calculatePercentage(organization.getCurrentPropertiesCount(), organization.getMaxProperties()))
                 .subscriptionStatus(organization.getSubscriptionStatus())
-                .subscriptionPlan(organization.getSubscriptionPlan())
                 .trialEndsAt(organization.getTrialEndsAt())
                 .subscriptionEndsAt(organization.getSubscriptionEndsAt())
                 .isActive(organization.getIsActive())
@@ -369,7 +364,6 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .id(organization.getId())
                 .name(organization.getName())
                 .logoUrl(organization.getLogoUrl())
-                .subscriptionPlan(organization.getSubscriptionPlan())
                 .subscriptionStatus(organization.getSubscriptionStatus())
                 .maxProperties(organization.getMaxProperties())
                 .currentPropertiesCount(organization.getCurrentPropertiesCount())
@@ -483,7 +477,6 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .currentUsersCount(organization.getCurrentUsersCount())
                 .currentPropertiesCount(organization.getCurrentPropertiesCount())
                 .subscriptionStatus(organization.getSubscriptionStatus())
-                .subscriptionPlan(organization.getSubscriptionPlan())
                 .isActive(organization.getIsActive())
                 .createdAt(organization.getCreatedAt())
                 .build();
@@ -517,7 +510,6 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .currentUsersCount(organization.getCurrentUsersCount())
                 .currentPropertiesCount(organization.getCurrentPropertiesCount())
                 .subscriptionStatus(organization.getSubscriptionStatus())
-                .subscriptionPlan(organization.getSubscriptionPlan())
                 .trialEndsAt(organization.getTrialEndsAt())
                 .subscriptionStartedAt(organization.getSubscriptionStartedAt())
                 .subscriptionEndsAt(organization.getSubscriptionEndsAt())

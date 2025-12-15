@@ -491,7 +491,7 @@ public class PropertyServiceImpl implements PropertyService {
 
     private void processPropertyImages(Property property, List<String> imageUrls) {
         // Validar límite según plan de suscripción
-        int maxImages = getMaxImagesForPlan(property.getOrganization().getSubscriptionPlan());
+        int maxImages = getMaxImagesForPlan(property.getOrganization().getPlanCode());
 
         if (imageUrls.size() > maxImages) {
             throw new OrganizationPropertyLimitException(
@@ -517,7 +517,7 @@ public class PropertyServiceImpl implements PropertyService {
 
     private void updatePropertyImages(Property property, List<String> newImageUrls) {
         // Validar límite según plan de suscripción
-        int maxImages = getMaxImagesForPlan(property.getOrganization().getSubscriptionPlan());
+        int maxImages = getMaxImagesForPlan(property.getOrganization().getPlanCode());
 
         if (newImageUrls.size() > maxImages) {
             throw new OrganizationPropertyLimitException(
