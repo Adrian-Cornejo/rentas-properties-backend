@@ -553,6 +553,7 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .maxProperties(organization.getMaxProperties())
                 .currentUsersCount(organization.getCurrentUsersCount())
                 .currentPropertiesCount(organization.getCurrentPropertiesCount())
+                .subscriptionId(organization.getPlanId())
                 .subscriptionPlan(organization.getPlanCode())
                 .subscriptionStatus(organization.getSubscriptionStatus())
                 .trialEndsAt(organization.getTrialEndsAt())

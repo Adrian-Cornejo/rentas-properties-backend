@@ -340,6 +340,9 @@ public class Organization {
     public String getPlanCode() {
         return subscriptionPlan != null ? subscriptionPlan.getPlanCode() : "STARTER";
     }
+    public UUID getPlanId() {
+        return  subscriptionPlan.getId();
+    }
 
     public boolean hasFeature(String feature) {
         if (subscriptionPlan == null) return false;
