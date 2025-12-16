@@ -203,6 +203,16 @@ public class MaintenanceRecordServiceImpl implements MaintenanceRecordService {
         User currentUser = getCurrentUser();
         validateUserCanAccessMaintenanceRecord(currentUser, record);
 
+        Organization organization = record.getOrganization();
+
+        if (!organization.hasFeature("MAINTENANCE_PHOTOS")) {
+            log.warn("Plan {} no permite fotos de mantenimiento", organization.getPlanCode());
+            throw new FeatureNotAvailableException(
+                    "Tu plan " + organization.getPlanCode() + " no permite agregar fotos a los registros de mantenimiento. " +
+                            "Por favor, mejora tu plan para habilitar esta funcionalidad."
+            );
+        }
+
         if (!imageType.matches("^(ANTES|DESPUES|EVIDENCIA)$")) {
             throw new IllegalArgumentException(
                     "El tipo de imagen debe ser: ANTES, DESPUES o EVIDENCIA");
@@ -430,6 +440,7 @@ public class MaintenanceRecordServiceImpl implements MaintenanceRecordService {
                 .emergencyCount(emergencyCount)
                 .build();
     }
+
 
     private User getCurrentUser() {
         String email = ((UserDetails) SecurityContextHolder.getContext()

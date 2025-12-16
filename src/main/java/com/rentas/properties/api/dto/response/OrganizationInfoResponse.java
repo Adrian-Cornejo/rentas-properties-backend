@@ -24,10 +24,10 @@ public class OrganizationInfoResponse {
     @Schema(description = "Organization logo URL")
     private String logoUrl;
 
-    @Schema(description = "Subscription plan", example = "BASICO", allowableValues = {"BASICO", "INTERMEDIO", "SUPERIOR"})
+    @Schema(description = "Subscription plan", example = "BASICO")
     private String subscriptionPlan;
 
-    @Schema(description = "Subscription status", example = "ACTIVE", allowableValues = {"TRIAL", "ACTIVE", "EXPIRED", "CANCELLED"})
+    @Schema(description = "Subscription status", example = "ACTIVE")
     private String subscriptionStatus;
 
     @Schema(description = "Maximum properties allowed", example = "5")

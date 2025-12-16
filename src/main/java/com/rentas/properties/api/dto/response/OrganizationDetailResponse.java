@@ -30,12 +30,15 @@ public class OrganizationDetailResponse {
     private Integer currentPropertiesCount;
     private String subscriptionStatus;
     private String subscriptionPlan;
+    private UUID subscriptionId;
     private LocalDateTime trialEndsAt;
     private LocalDateTime subscriptionStartedAt;
     private LocalDateTime subscriptionEndsAt;
     private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Long daysUntilTrialEnds;
+    private Long daysUntilSubscriptionEnds;
 
     @Data
     @Builder

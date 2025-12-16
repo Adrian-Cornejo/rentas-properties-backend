@@ -79,14 +79,11 @@ public class Organization {
     @JoinColumn(name = "owner_id", foreignKey = @ForeignKey(name = "fk_organization_owner"))
     private User owner;
 
-    // Límites según plan
-    @Column(name = "max_users")
-    @Builder.Default
-    private Integer maxUsers = 3;
-
     @Column(name = "max_properties")
-    @Builder.Default
-    private Integer maxProperties = 3;
+    private Integer maxProperties;
+
+    @Column(name = "max_users")
+    private Integer maxUsers;
 
     @Column(name = "current_users_count")
     @Builder.Default
@@ -101,11 +98,6 @@ public class Organization {
     @Column(name = "subscription_status", length = 50)
     @Builder.Default
     private String subscriptionStatus = "trial"; // trial, active, suspended, cancelled
-
-    @Size(max = 50)
-    @Column(name = "subscription_plan", length = 50)
-    @Builder.Default
-    private String subscriptionPlan = "free"; // free, basic, pro, enterprise
 
     @Column(name = "trial_ends_at")
     private LocalDateTime trialEndsAt;
@@ -134,9 +126,6 @@ public class Organization {
     @Column(name = "notification_enabled")
     private Boolean notificationEnabled;
 
-    @Column(name = "notification_channel", length = 20)
-    private String notificationChannel; // SMS, WHATSAPP, BOTH
-
     @Column(name = "notifications_sent_this_month")
     private Integer notificationsSentThisMonth;
 
@@ -148,6 +137,12 @@ public class Organization {
 
     @Column(name = "admin_notifications")
     private Boolean adminNotifications;
+
+    @Column(name = "notification_channels", length = 50)
+    private String notificationChannels; // SMS, WHATSAPP, BOTH, UNLIMITED
+
+    @Column(name = "admin_digest_enabled")
+    private Boolean adminDigestEnabled = false;
 
     // Relaciones
     @OneToMany(mappedBy = "organization", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
@@ -173,6 +168,10 @@ public class Organization {
     @OneToMany(mappedBy = "organization", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
     private List<MaintenanceRecord> maintenanceRecords = new ArrayList<>();
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subscription_plan_id")
+    private SubscriptionPlan subscriptionPlan;
 
     @PrePersist
     protected void onCreate() {
@@ -238,13 +237,7 @@ public class Organization {
         return currentPropertiesCount != null && maxProperties != null && currentPropertiesCount >= maxProperties;
     }
 
-    public boolean canAddUser() {
-        return !hasReachedUserLimit() && isSubscriptionActive() && isActive();
-    }
 
-    public boolean canAddProperty() {
-        return !hasReachedPropertyLimit() && isSubscriptionActive() && isActive();
-    }
 
     public void incrementUsersCount() {
         this.currentUsersCount = (this.currentUsersCount != null ? this.currentUsersCount : 0) + 1;
@@ -291,6 +284,121 @@ public class Organization {
         return 0;
     }
 
+    public void syncLimitsFromPlan() {
+        if (this.subscriptionPlan != null) {
+            this.maxProperties = subscriptionPlan.getMaxProperties();
+            this.maxUsers = subscriptionPlan.getMaxUsers();
+            this.notificationLimit = subscriptionPlan.getMonthlyNotificationLimit();
+
+            if (subscriptionPlan.getNotificationChannels() != null) {
+                switch (subscriptionPlan.getNotificationChannels()) {
+                    case "SMS_OR_WHATSAPP":
+                        this.notificationChannels = "SMS"; // Default a SMS
+                        break;
+                    case "BOTH":
+                        this.notificationChannels = "BOTH";
+                        break;
+                    case "UNLIMITED":
+                        this.notificationChannels = "UNLIMITED";
+                        break;
+                    default:
+                        this.notificationChannels = null;
+                }
+            }
+        }
+    }
+
+    public boolean canAddProperty() {
+        if (subscriptionPlan == null) return false;
+        if (subscriptionPlan.getMaxProperties() == -1) return true; // Ilimitado
+        return currentPropertiesCount < subscriptionPlan.getMaxProperties();
+    }
+
+    public boolean canAddUser() {
+        if (subscriptionPlan == null) return false;
+        if (subscriptionPlan.getMaxUsers() == -1) return true; // Ilimitado
+        return currentUsersCount < subscriptionPlan.getMaxUsers();
+    }
+
+    public boolean canUploadImages() {
+        if (subscriptionPlan == null) return false;
+        return subscriptionPlan.getImagesPerProperty() > 0;
+    }
+
+    public int getImagesPerPropertyLimit() {
+        if (subscriptionPlan == null) return 0;
+        return subscriptionPlan.getImagesPerProperty();
+    }
+
+
+    public boolean canSendNotification() {
+        if (!notificationEnabled) return false;
+        if (notificationLimit == -1) return true; // Ilimitado
+        return notificationsSentThisMonth < notificationLimit;
+    }
+
+    public String getPlanCode() {
+        return subscriptionPlan != null ? subscriptionPlan.getPlanCode() : "STARTER";
+    }
+    public UUID getPlanId() {
+        return  subscriptionPlan.getId();
+    }
+
+    public boolean hasFeature(String feature) {
+        if (subscriptionPlan == null) return false;
+
+        return switch (feature) {
+            case "MAINTENANCE_PHOTOS" -> subscriptionPlan.getHasMaintenancePhotos();
+            case "ADVANCED_REPORTS" -> subscriptionPlan.getHasAdvancedReports();
+            case "DATA_EXPORT" -> subscriptionPlan.getHasDataExport();
+            case "PDF_REPORTS" -> subscriptionPlan.getHasPdfReports();
+            case "API_ACCESS" -> subscriptionPlan.getHasApiAccess();
+            case "WHITE_LABEL" -> subscriptionPlan.getHasWhiteLabel();
+            default -> false;
+        };
+    }
+
+    public void resetMonthlyNotifications() {
+        this.notificationsSentThisMonth = 0;
+        this.lastNotificationReset = LocalDate.now();
+    }
+
+    public void incrementNotificationsSent() {
+        if (this.notificationsSentThisMonth == null) {
+            this.notificationsSentThisMonth = 0;
+        }
+        this.notificationsSentThisMonth++;
+    }
+
+    public Integer getMonthlyNotificationLimit() {
+        if (subscriptionPlan == null) {
+            return 0;
+        }
+        return subscriptionPlan.getMonthlyNotificationLimit();
+    }
+
+    public void incrementNotificationCount(int count) {
+        if (this.notificationsSentThisMonth == null) {
+            this.notificationsSentThisMonth = 0;
+        }
+        this.notificationsSentThisMonth += count;
+    }
+
+
+    public Integer getRemainingNotifications() {
+        Integer limit = getMonthlyNotificationLimit();
+
+        if (limit == null || limit == 0) {
+            return 0;
+        }
+
+        if (limit == -1) {
+            return -1; // ilimitado
+        }
+
+        int sent = this.notificationsSentThisMonth != null ? this.notificationsSentThisMonth : 0;
+        return Math.max(0, limit - sent);
+    }
 
     public String getOwnerName() {
         return owner != null ? owner.getFullName() : "Sin dueño";
@@ -300,19 +408,4 @@ public class Organization {
         return owner != null ? owner.getEmail() : "N/A";
     }
 
-    public boolean isFreePlan() {
-        return "free".equalsIgnoreCase(this.subscriptionPlan);
-    }
-
-    public boolean isBasicPlan() {
-        return "basic".equalsIgnoreCase(this.subscriptionPlan);
-    }
-
-    public boolean isProPlan() {
-        return "pro".equalsIgnoreCase(this.subscriptionPlan);
-    }
-
-    public boolean isEnterprisePlan() {
-        return "enterprise".equalsIgnoreCase(this.subscriptionPlan);
-    }
 }

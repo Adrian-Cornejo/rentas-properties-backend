@@ -22,8 +22,6 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
 
     List<Organization> findBySubscriptionStatus(String subscriptionStatus);
 
-    List<Organization> findBySubscriptionPlan(String subscriptionPlan);
-
     List<Organization> findByIsActiveTrue();
 
     Optional<Organization> findByOwnerId(UUID ownerId);

@@ -10,12 +10,15 @@ import com.rentas.properties.api.exception.InvitationCodeAlreadyExistsException;
 import com.rentas.properties.api.exception.InvitationCodeInvalidException;
 import com.rentas.properties.api.exception.OrganizationNotFoundException;
 import com.rentas.properties.api.exception.UnauthorizedAccessException;
+import com.rentas.properties.api.exception.BusinessException;
 import com.rentas.properties.business.services.CloudinaryService;
 import com.rentas.properties.business.services.OrganizationService;
 import com.rentas.properties.dao.entity.Organization;
+import com.rentas.properties.dao.entity.SubscriptionPlan;
 import com.rentas.properties.dao.entity.User;
 import com.rentas.properties.dao.repository.OrganizationRepository;
 import com.rentas.properties.dao.repository.PropertyRepository;
+import com.rentas.properties.dao.repository.SubscriptionPlanRepository;
 import com.rentas.properties.dao.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +27,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +44,7 @@ public class OrganizationServiceImpl implements OrganizationService {
     private final UserRepository userRepository;
     private final PropertyRepository propertyRepository;
     private final CloudinaryService cloudinaryService;
+    private final SubscriptionPlanRepository subscriptionPlanRepository;
 
     @Override
     @Transactional
@@ -49,11 +54,17 @@ public class OrganizationServiceImpl implements OrganizationService {
         User currentUser = getCurrentUser();
         validateUserIsAdmin(currentUser);
 
+        SubscriptionPlan starterPlan = subscriptionPlanRepository.findByPlanCode("STARTER")
+                .orElseThrow(() -> new BusinessException(
+                        "Plan STARTER no encontrado. Por favor, ejecute las migraciones de base de datos."
+                ));
+
         String invitationCode = generateUniqueInvitationCode();
         log.debug("Código de invitación generado: {}", invitationCode);
 
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime trialEndsAt = now.plusDays(30);
+
+        LocalDateTime trialEndsAt = now.plusDays(starterPlan.getTrialDays());
 
         Organization organization = Organization.builder()
                 .name(request.getName())
@@ -64,20 +75,29 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .logoUrl(request.getLogoUrl())
                 .codeIsReusable(true)
                 .owner(currentUser)
-                .maxUsers(3)
-                .maxProperties(5)
+                .subscriptionPlan(starterPlan)
+                .maxUsers(starterPlan.getMaxUsers())
+                .maxProperties(starterPlan.getMaxProperties())
                 .currentUsersCount(1)
                 .currentPropertiesCount(0)
-                .subscriptionStatus("TRIAL")
-                .subscriptionPlan("BASIC")
+                .subscriptionStatus("trial")
                 .trialEndsAt(trialEndsAt)
+                .subscriptionStartedAt(now)
+                .notificationEnabled(starterPlan.getHasNotifications())
+                .notificationLimit(starterPlan.getMonthlyNotificationLimit())
+                .notificationsSentThisMonth(0)
+                .lastNotificationReset(LocalDate.now())
+                .adminDigestEnabled(starterPlan.getHasAdminDigest())
                 .isActive(true)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
 
+        organization.syncLimitsFromPlan();
+
         Organization savedOrganization = organizationRepository.save(organization);
-        log.info("Organización creada exitosamente con ID: {}", savedOrganization.getId());
+        log.info("Organización creada exitosamente con ID: {} y plan: {}",
+                savedOrganization.getId(), starterPlan.getPlanCode());
 
         currentUser.setOrganization(savedOrganization);
         currentUser.setOrganizationJoinedAt(now);
@@ -182,22 +202,19 @@ public class OrganizationServiceImpl implements OrganizationService {
 
         if ("ADMIN".equals(currentUser.getRole())) {
             if (request.getMaxUsers() != null) {
-                organization.setMaxUsers(request.getMaxUsers());
+                log.warn("Intento de cambiar maxUsers manualmente. Use OrganizationPlanService para cambiar planes.");
             }
 
             if (request.getMaxProperties() != null) {
-                organization.setMaxProperties(request.getMaxProperties());
+                log.warn("Intento de cambiar maxProperties manualmente. Use OrganizationPlanService para cambiar planes.");
             }
 
             if (request.getSubscriptionStatus() != null) {
                 organization.setSubscriptionStatus(request.getSubscriptionStatus());
             }
-
-            if (request.getSubscriptionPlan() != null) {
-                organization.setSubscriptionPlan(request.getSubscriptionPlan());
-            }
         }
 
+        organization.setUpdatedAt(LocalDateTime.now());
         Organization updatedOrganization = organizationRepository.save(organization);
         log.info("Organización actualizada exitosamente: {}", updatedOrganization.getName());
 
@@ -260,12 +277,18 @@ public class OrganizationServiceImpl implements OrganizationService {
             throw new InvitationCodeInvalidException("La organización no puede aceptar nuevos miembros en este momento");
         }
 
-        if (organization.getCurrentUsersCount() >= organization.getMaxUsers()) {
-            log.warn("Código válido pero límite de usuarios alcanzado: {}", code);
-            throw new InvitationCodeInvalidException("La organización ha alcanzado el límite máximo de usuarios");
+        if (!organization.canAddUser()) {
+            log.warn("Código válido pero límite de usuarios alcanzado: {}. Plan: {}, Max: {}, Current: {}",
+                    code, organization.getPlanCode(), organization.getMaxUsers(), organization.getCurrentUsersCount());
+            throw new InvitationCodeInvalidException(String.format(
+                    "La organización ha alcanzado el límite máximo de usuarios (%d/%d). " +
+                            "Por favor, solicite al administrador que mejore el plan.",
+                    organization.getCurrentUsersCount(), organization.getMaxUsers()
+            ));
         }
 
-        log.info("Código de invitación válido para organización: {}", organization.getName());
+        log.info("Código de invitación válido para organización: {} con plan: {}",
+                organization.getName(), organization.getPlanCode());
         return mapToResponse(organization);
     }
 
@@ -283,21 +306,30 @@ public class OrganizationServiceImpl implements OrganizationService {
         Long activeUsers = userRepository.countByOrganizationId(id);
         Long activeProperties = propertyRepository.countActiveByOrganization_Id(id);
 
+        double usersPercentage = calculateUsagePercentage(
+                organization.getCurrentUsersCount(), organization.getMaxUsers());
+        double propertiesPercentage = calculateUsagePercentage(
+                organization.getCurrentPropertiesCount(), organization.getMaxProperties());
+
         return OrganizationStatsResponse.builder()
                 .organizationId(organization.getId())
                 .organizationName(organization.getName())
                 .currentUsersCount(organization.getCurrentUsersCount())
                 .maxUsers(organization.getMaxUsers())
                 .usersAvailable(organization.getMaxUsers() - organization.getCurrentUsersCount())
-                .usersPercentage(calculatePercentage(organization.getCurrentUsersCount(), organization.getMaxUsers()))
+                .usersPercentage(usersPercentage)
                 .currentPropertiesCount(organization.getCurrentPropertiesCount())
                 .maxProperties(organization.getMaxProperties())
                 .propertiesAvailable(organization.getMaxProperties() - organization.getCurrentPropertiesCount())
-                .propertiesPercentage(calculatePercentage(organization.getCurrentPropertiesCount(), organization.getMaxProperties()))
+                .propertiesPercentage(propertiesPercentage)
+                .nearUserLimit(usersPercentage >= 80.0)
+                .nearPropertyLimit(propertiesPercentage >= 80.0)
+                .subscriptionPlan(organization.getPlanCode())
                 .subscriptionStatus(organization.getSubscriptionStatus())
-                .subscriptionPlan(organization.getSubscriptionPlan())
                 .trialEndsAt(organization.getTrialEndsAt())
                 .subscriptionEndsAt(organization.getSubscriptionEndsAt())
+                .daysUntilTrialEnds(organization.getDaysUntilTrialEnds())
+                .daysUntilSubscriptionEnds(organization.getDaysUntilSubscriptionEnds())
                 .isActive(organization.getIsActive())
                 .build();
     }
@@ -328,7 +360,8 @@ public class OrganizationServiceImpl implements OrganizationService {
         }
 
         Organization organization = currentUser.getOrganization();
-        log.debug("Organización encontrada: {} para usuario: {}", organization.getName(), currentUser.getEmail());
+        log.debug("Organización encontrada: {} con plan: {} para usuario: {}",
+                organization.getName(), organization.getPlanCode(), currentUser.getEmail());
 
         return Optional.of(mapToDetailResponse(organization));
     }
@@ -363,14 +396,15 @@ public class OrganizationServiceImpl implements OrganizationService {
         }
 
         Organization organization = currentUser.getOrganization();
-        log.debug("Organización encontrada: {} para usuario: {}", organization.getName(), currentUser.getEmail());
+        log.debug("Organización encontrada: {} con plan: {} para usuario: {}",
+                organization.getName(), organization.getPlanCode(), currentUser.getEmail());
 
         return OrganizationInfoResponse.builder()
                 .id(organization.getId())
                 .name(organization.getName())
                 .logoUrl(organization.getLogoUrl())
-                .subscriptionPlan(organization.getSubscriptionPlan())
                 .subscriptionStatus(organization.getSubscriptionStatus())
+                .subscriptionPlan(organization.getPlanCode())
                 .maxProperties(organization.getMaxProperties())
                 .currentPropertiesCount(organization.getCurrentPropertiesCount())
                 .maxUsers(organization.getMaxUsers())
@@ -462,8 +496,11 @@ public class OrganizationServiceImpl implements OrganizationService {
         return code.toString();
     }
 
-    private double calculatePercentage(Integer current, Integer max) {
-        if (max == null || max == 0) {
+    private double calculateUsagePercentage(Integer current, Integer max) {
+        if (max == null || max == 0 || max == -1) { // -1 = ilimitado
+            return 0.0;
+        }
+        if (current == null) {
             return 0.0;
         }
         return (current * 100.0) / max;
@@ -482,8 +519,8 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .maxProperties(organization.getMaxProperties())
                 .currentUsersCount(organization.getCurrentUsersCount())
                 .currentPropertiesCount(organization.getCurrentPropertiesCount())
+                .subscriptionPlan(organization.getPlanCode())
                 .subscriptionStatus(organization.getSubscriptionStatus())
-                .subscriptionPlan(organization.getSubscriptionPlan())
                 .isActive(organization.getIsActive())
                 .createdAt(organization.getCreatedAt())
                 .build();
@@ -516,11 +553,14 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .maxProperties(organization.getMaxProperties())
                 .currentUsersCount(organization.getCurrentUsersCount())
                 .currentPropertiesCount(organization.getCurrentPropertiesCount())
+                .subscriptionId(organization.getPlanId())
+                .subscriptionPlan(organization.getPlanCode())
                 .subscriptionStatus(organization.getSubscriptionStatus())
-                .subscriptionPlan(organization.getSubscriptionPlan())
                 .trialEndsAt(organization.getTrialEndsAt())
                 .subscriptionStartedAt(organization.getSubscriptionStartedAt())
                 .subscriptionEndsAt(organization.getSubscriptionEndsAt())
+                .daysUntilTrialEnds(organization.getDaysUntilTrialEnds())
+                .daysUntilSubscriptionEnds(organization.getDaysUntilSubscriptionEnds())
                 .isActive(organization.getIsActive())
                 .createdAt(organization.getCreatedAt())
                 .updatedAt(organization.getUpdatedAt())

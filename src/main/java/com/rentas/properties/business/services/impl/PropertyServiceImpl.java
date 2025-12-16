@@ -47,12 +47,16 @@ public class PropertyServiceImpl implements PropertyService {
 
         Organization organization = currentUser.getOrganization();
 
-        if (organization.getCurrentPropertiesCount() >= organization.getMaxProperties()) {
-            log.warn("Organización {} alcanzó límite de propiedades: {}/{}",
-                    organization.getId(), organization.getCurrentPropertiesCount(), organization.getMaxProperties());
+        if (!organization.canAddProperty()) {
+            log.warn("Organización {} alcanzó límite de propiedades. Plan: {}, Actual: {}, Máximo: {}",
+                    organization.getId(),
+                    organization.getPlanCode(),
+                    organization.getCurrentPropertiesCount(),
+                    organization.getMaxProperties());
             throw new OrganizationPropertyLimitException(
                     "Has alcanzado el límite máximo de propiedades (" + organization.getMaxProperties() + ") " +
-                            "según tu plan " + organization.getSubscriptionPlan()
+                            "según tu plan " + organization.getPlanCode() + ". " +
+                            "Por favor, mejora tu plan para agregar más propiedades."
             );
         }
 
@@ -107,10 +111,10 @@ public class PropertyServiceImpl implements PropertyService {
         Property savedProperty = propertyRepository.save(property);
 
         if (request.getImageUrls() != null && !request.getImageUrls().isEmpty()) {
-            processPropertyImages(savedProperty, request.getImageUrls());
+            processPropertyImages(savedProperty, request.getImageUrls(), organization);
         }
 
-        organization.setCurrentPropertiesCount(organization.getCurrentPropertiesCount() + 1);
+        organization.incrementPropertiesCount();
         organizationRepository.save(organization);
 
         log.info("Propiedad creada exitosamente con ID: {} - Contador de organización: {}/{}",
@@ -281,7 +285,7 @@ public class PropertyServiceImpl implements PropertyService {
         }
 
         if (request.getImageUrls() != null) {
-            updatePropertyImages(property, request.getImageUrls());
+            updatePropertyImages(property, request.getImageUrls(), property.getOrganization());
         }
 
         Property updatedProperty = propertyRepository.save(property);
@@ -320,7 +324,8 @@ public class PropertyServiceImpl implements PropertyService {
         }
 
         Organization organization = property.getOrganization();
-        organization.setCurrentPropertiesCount(organization.getCurrentPropertiesCount() - 1);
+
+        organization.decrementPropertiesCount();
         organizationRepository.save(organization);
 
         propertyRepository.delete(property);
@@ -436,6 +441,7 @@ public class PropertyServiceImpl implements PropertyService {
                 .collect(Collectors.toList());
     }
 
+
     private User getCurrentUser() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         String email;
@@ -489,17 +495,27 @@ public class PropertyServiceImpl implements PropertyService {
         }
     }
 
-    private void processPropertyImages(Property property, List<String> imageUrls) {
-        // Validar límite según plan de suscripción
-        int maxImages = getMaxImagesForPlan(property.getOrganization().getSubscriptionPlan());
-
-        if (imageUrls.size() > maxImages) {
+    private void processPropertyImages(Property property, List<String> imageUrls, Organization organization) {
+        if (!organization.canUploadImages()) {
+            log.warn("Plan {} no permite subir imágenes", organization.getPlanCode());
             throw new OrganizationPropertyLimitException(
-                    "Has excedido el límite de " + maxImages + " imágenes por propiedad según tu plan"
+                    "Tu plan " + organization.getPlanCode() + " no permite subir imágenes. " +
+                            "Por favor, mejora tu plan para habilitar esta funcionalidad."
             );
         }
 
-        // Crear PropertyImage entities
+        int maxImages = organization.getImagesPerPropertyLimit();
+
+        if (imageUrls.size() > maxImages) {
+            log.warn("Intento de subir {} imágenes cuando el plan {} permite máximo {}",
+                    imageUrls.size(), organization.getPlanCode(), maxImages);
+            throw new OrganizationPropertyLimitException(
+                    "Has excedido el límite de " + maxImages + " imágenes por propiedad " +
+                            "según tu plan " + organization.getPlanCode() + ". " +
+                            "Por favor, mejora tu plan para subir más imágenes."
+            );
+        }
+
         for (int i = 0; i < imageUrls.size(); i++) {
             String imageUrl = imageUrls.get(i);
             PropertyImage propertyImage = PropertyImage.builder()
@@ -507,7 +523,7 @@ public class PropertyServiceImpl implements PropertyService {
                     .imageUrl(imageUrl)
                     .imagePublicId(extractPublicIdFromUrl(imageUrl))
                     .displayOrder(i)
-                    .isMain(i == 0) // Primera imagen es la principal
+                    .isMain(i == 0)
                     .createdBy(getCurrentUser().getId())
                     .build();
 
@@ -515,13 +531,21 @@ public class PropertyServiceImpl implements PropertyService {
         }
     }
 
-    private void updatePropertyImages(Property property, List<String> newImageUrls) {
-        // Validar límite según plan de suscripción
-        int maxImages = getMaxImagesForPlan(property.getOrganization().getSubscriptionPlan());
+
+    private void updatePropertyImages(Property property, List<String> newImageUrls, Organization organization) {
+        if (!organization.canUploadImages()) {
+            throw new OrganizationPropertyLimitException(
+                    "Tu plan " + organization.getPlanCode() + " no permite subir imágenes. " +
+                            "Por favor, mejora tu plan para habilitar esta funcionalidad."
+            );
+        }
+
+        int maxImages = organization.getImagesPerPropertyLimit();
 
         if (newImageUrls.size() > maxImages) {
             throw new OrganizationPropertyLimitException(
-                    "Has excedido el límite de " + maxImages + " imágenes por propiedad según tu plan"
+                    "Has excedido el límite de " + maxImages + " imágenes por propiedad " +
+                            "según tu plan " + organization.getPlanCode()
             );
         }
 
@@ -586,19 +610,6 @@ public class PropertyServiceImpl implements PropertyService {
         } catch (Exception e) {
             log.warn("Failed to delete image from Cloudinary - url: {}, error: {}",
                     imageUrl, e.getMessage());
-        }
-    }
-
-    private int getMaxImagesForPlan(String plan) {
-        switch (plan) {
-            case "BASICO":
-                return 3;
-            case "INTERMEDIO":
-                return 5;
-            case "SUPERIOR":
-                return 10;
-            default:
-                return 3;
         }
     }
 

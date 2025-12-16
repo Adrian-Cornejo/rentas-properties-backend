@@ -32,5 +32,10 @@ public class OrganizationStatsResponse {
     private LocalDateTime trialEndsAt;
     private LocalDateTime subscriptionEndsAt;
 
+    private Boolean nearUserLimit;
+    private Boolean nearPropertyLimit;
+    private Long daysUntilTrialEnds;
+    private Long daysUntilSubscriptionEnds;
+
     private Boolean isActive;
 }
