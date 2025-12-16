@@ -367,6 +367,35 @@ public class Organization {
         this.notificationsSentThisMonth++;
     }
 
+    public Integer getMonthlyNotificationLimit() {
+        if (subscriptionPlan == null) {
+            return 0;
+        }
+        return subscriptionPlan.getMonthlyNotificationLimit();
+    }
+
+    public void incrementNotificationCount(int count) {
+        if (this.notificationsSentThisMonth == null) {
+            this.notificationsSentThisMonth = 0;
+        }
+        this.notificationsSentThisMonth += count;
+    }
+
+
+    public Integer getRemainingNotifications() {
+        Integer limit = getMonthlyNotificationLimit();
+
+        if (limit == null || limit == 0) {
+            return 0;
+        }
+
+        if (limit == -1) {
+            return -1; // ilimitado
+        }
+
+        int sent = this.notificationsSentThisMonth != null ? this.notificationsSentThisMonth : 0;
+        return Math.max(0, limit - sent);
+    }
 
     public String getOwnerName() {
         return owner != null ? owner.getFullName() : "Sin dueño";

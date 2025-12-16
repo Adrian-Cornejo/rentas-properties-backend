@@ -64,6 +64,8 @@ public class NotificationServiceImpl {
 
         for (Organization org : organizations) {
             try {
+                resetMonthlyCounterIfNeeded(org);
+
                 processOrganizationReminders(org, today, threeDaysLater, threeDaysAgo);
             } catch (Exception e) {
                 log.error("Error procesando notificaciones para organización {}: {}",
@@ -75,20 +77,50 @@ public class NotificationServiceImpl {
     }
 
     @Transactional
+    public void resetMonthlyCounterIfNeeded(Organization org) {
+        LocalDate lastReset = org.getLastNotificationReset();
+        LocalDate now = LocalDate.now();
+
+
+        if (lastReset == null ||
+                lastReset.getYear() != now.getYear() ||
+                lastReset.getMonthValue() != now.getMonthValue()) {
+
+            log.info("Reseteando contador mensual para organización {} - Último reset: {}",
+                    org.getId(), lastReset);
+
+            org.setNotificationsSentThisMonth(0);
+            org.setLastNotificationReset(now);
+            organizationRepository.save(org);
+
+            log.info("Contador reseteado exitosamente para organización {}", org.getId());
+        }
+    }
+
+    @Transactional
     public void processOrganizationReminders(Organization org, LocalDate today,
                                              LocalDate threeDaysLater, LocalDate threeDaysAgo) {
 
-        log.info("Procesando recordatorios para organización: {} ({})", org.getName(), org.getId());
+        log.info("Procesando recordatorios para organización: {} ({}) - Plan: {}",
+                org.getName(), org.getId(), org.getPlanCode());
 
-        // Validar límite mensual
-        if (org.getNotificationsSentThisMonth() >= org.getNotificationLimit()) {
-            log.warn("Organización {} ha excedido su límite mensual de notificaciones", org.getId());
-            // TODO: Enviar email al admin
+        if (!org.hasFeature("NOTIFICATIONS")) {
+            log.info("Organización {} con plan {} no tiene notificaciones habilitadas",
+                    org.getId(), org.getPlanCode());
             return;
         }
 
+        Integer monthlyLimit = org.getMonthlyNotificationLimit();
+        if (monthlyLimit != null && monthlyLimit != -1) {
+            if (org.getNotificationsSentThisMonth() >= monthlyLimit) {
+                log.warn("Organización {} ha excedido su límite mensual de notificaciones ({}/{})",
+                        org.getId(), org.getNotificationsSentThisMonth(), monthlyLimit);
+                // TODO: Enviar email al admin
+                return;
+            }
+        }
+
         String channel = org.getNotificationChannels();
-        SubscriptionPlan plan = org.getSubscriptionPlan();
 
         // Obtener pagos que requieren notificación
         List<Payment> paymentsToNotify = new ArrayList<>();
@@ -105,8 +137,7 @@ public class NotificationServiceImpl {
         );
         paymentsToNotify.addAll(filterNotifiablePayments(paymentsDueToday));
 
-        // 3 días después (solo SUPERIOR y si está atrasado)
-        if ("SUPERIOR".equals(plan)) {
+        if (org.hasFeature("OVERDUE_NOTIFICATIONS")) {
             List<Payment> paymentsOverdue3Days = paymentRepository.findByDueDateAndOrganization(
                             threeDaysAgo, org.getId()
                     ).stream()
@@ -121,10 +152,11 @@ public class NotificationServiceImpl {
         int sentCount = 0;
 
         for (Payment payment : paymentsToNotify) {
-            // Validar que no exceda límite
-            if (org.getNotificationsSentThisMonth() + sentCount >= org.getNotificationLimit()) {
-                log.warn("Se alcanzó el límite de notificaciones para organización {}", org.getId());
-                break;
+            if (monthlyLimit != null && monthlyLimit != -1) {
+                if (org.getNotificationsSentThisMonth() + sentCount >= monthlyLimit) {
+                    log.warn("Se alcanzó el límite de notificaciones para organización {}", org.getId());
+                    break;
+                }
             }
 
             try {
@@ -135,13 +167,12 @@ public class NotificationServiceImpl {
             }
         }
 
-        // Actualizar contador
         if (sentCount > 0) {
-            organizationRepository.incrementNotificationCount(org.getId(), sentCount);
+            org.incrementNotificationCount(sentCount);
+            organizationRepository.save(org);
         }
 
-        // Enviar consolidado al admin si está habilitado
-        if (org.getAdminNotifications() && !paymentsToNotify.isEmpty()) {
+        if (org.hasFeature("ADMIN_DIGEST") && !paymentsToNotify.isEmpty()) {
             sendAdminConsolidatedReport(org, paymentsToNotify, channel);
         }
     }
@@ -433,14 +464,17 @@ public class NotificationServiceImpl {
 
         Organization org = currentUser.getOrganization();
 
-        int remaining = Math.max(0, org.getNotificationLimit() - org.getNotificationsSentThisMonth());
+        Integer monthlyLimit = org.getMonthlyNotificationLimit();
+        int remaining = monthlyLimit != null && monthlyLimit != -1
+                ? Math.max(0, monthlyLimit - org.getNotificationsSentThisMonth())
+                : -1; // -1 = ilimitado
 
         return NotificationSettingsResponse.builder()
                 .enabled(org.getNotificationEnabled())
                 .channel(org.getNotificationChannels())
-                .adminNotifications(org.getAdminNotifications())
+                .adminNotifications(org.getAdminDigestEnabled())
                 .sentThisMonth(org.getNotificationsSentThisMonth())
-                .monthlyLimit(org.getNotificationLimit())
+                .monthlyLimit(monthlyLimit != null ? monthlyLimit : -1)
                 .remainingCredits(remaining)
                 .subscriptionPlan(org.getPlanCode())
                 .build();
@@ -453,26 +487,33 @@ public class NotificationServiceImpl {
         validateUserIsAdmin(currentUser);
 
         Organization org = currentUser.getOrganization();
-        String plan = org.getPlanCode();
 
-        // Validar según plan
-        if ("BASICO".equals(plan) && request.getEnabled()) {
-            throw new UnauthorizedAccessException(
-                    "El plan BASICO no incluye notificaciones. Actualiza a plan INTERMEDIO o SUPERIOR");
+        if (request.getEnabled() && !org.hasFeature("NOTIFICATIONS")) {
+            throw new FeatureNotAvailableException(
+                    "Tu plan " + org.getPlanCode() + " no incluye notificaciones. " +
+                            "Por favor, mejora tu plan para habilitar esta funcionalidad."
+            );
         }
 
-        if ("INTERMEDIO".equals(plan) && "BOTH".equals(request.getChannel())) {
-            throw new UnauthorizedAccessException(
-                    "El plan INTERMEDIO solo permite SMS o WHATSAPP, no ambos. Actualiza a plan SUPERIOR");
+        if ("BOTH".equals(request.getChannel()) && !org.hasFeature("MULTI_CHANNEL_NOTIFICATIONS")) {
+            throw new FeatureNotAvailableException(
+                    "Tu plan " + org.getPlanCode() + " no permite enviar por SMS y WhatsApp simultáneamente. " +
+                            "Por favor, mejora tu plan para habilitar ambos canales."
+            );
         }
-
-        // Calcular límite según plan
-        int limit = calculateNotificationLimit(org);
 
         org.setNotificationEnabled(request.getEnabled());
         org.setNotificationChannels(request.getChannel());
-        org.setAdminNotifications(request.getAdminNotifications() != null ? request.getAdminNotifications() : true);
-        org.setNotificationLimit(limit);
+
+        if (request.getAdminNotifications() != null) {
+            if (request.getAdminNotifications() && !org.hasFeature("ADMIN_DIGEST")) {
+                throw new FeatureNotAvailableException(
+                        "Tu plan " + org.getPlanCode() + " no incluye resumen diario para administradores. " +
+                                "Por favor, mejora tu plan para habilitar esta funcionalidad."
+                );
+            }
+            org.setAdminDigestEnabled(request.getAdminNotifications());
+        }
 
         if (org.getLastNotificationReset() == null) {
             org.setLastNotificationReset(LocalDate.now());
@@ -480,30 +521,26 @@ public class NotificationServiceImpl {
 
         organizationRepository.save(org);
 
-        log.info("Configuración de notificaciones actualizada para organización {}", org.getId());
+        log.info("Configuración de notificaciones actualizada para organización {} - Plan: {}",
+                org.getId(), org.getPlanCode());
 
         return getSettings();
     }
 
-    private int calculateNotificationLimit(Organization org) {
-        String plan = org.getPlanCode();
-
-        if ("BASICO".equals(plan)) {
-            return 0;
-        } else if ("INTERMEDIO".equals(plan)) {
-            int maxProperties = org.getMaxProperties();
-            return maxProperties * 3 * 2; // propiedades × 3 contratos × 2 recordatorios
-        } else if ("SUPERIOR".equals(plan)) {
-            return 1000;
-        }
-
-        return 0;
-    }
 
     @Transactional
     public void sendTestNotification(SendTestNotificationRequest request) {
         User currentUser = getCurrentUser();
         validateUserHasOrganization(currentUser);
+
+        Organization org = currentUser.getOrganization();
+
+        if (!org.hasFeature("NOTIFICATIONS")) {
+            throw new FeatureNotAvailableException(
+                    "Tu plan " + org.getPlanCode() + " no incluye notificaciones. " +
+                            "No puedes enviar notificaciones de prueba."
+            );
+        }
 
         String phone = normalizePhoneNumber(request.getPhoneNumber());
         String channel = request.getChannel();
@@ -541,7 +578,10 @@ public class NotificationServiceImpl {
 
         Organization org = currentUser.getOrganization();
 
-        int remaining = Math.max(0, org.getNotificationLimit() - org.getNotificationsSentThisMonth());
+        Integer monthlyLimit = org.getMonthlyNotificationLimit();
+        int remaining = monthlyLimit != null && monthlyLimit != -1
+                ? Math.max(0, monthlyLimit - org.getNotificationsSentThisMonth())
+                : -1;
 
         // Calcular tasa de entrega
         var deliveryRate = NotificationStatsResponse.calculateDeliveryRate(totalDelivered, totalSent);
@@ -574,7 +614,7 @@ public class NotificationServiceImpl {
                 .totalDelivered(totalDelivered)
                 .totalFailed(totalFailed)
                 .sentThisMonth(org.getNotificationsSentThisMonth())
-                .monthlyLimit(org.getNotificationLimit())
+                .monthlyLimit(monthlyLimit != null ? monthlyLimit : -1)
                 .remainingCredits(remaining)
                 .deliveryRate(deliveryRate)
                 .chartData(chartData)
@@ -620,6 +660,7 @@ public class NotificationServiceImpl {
         }
         return phone.substring(0, 6) + "XXXXX" + phone.substring(phone.length() - 2);
     }
+
 
     private User getCurrentUser() {
         String email = ((UserDetails) SecurityContextHolder.getContext()

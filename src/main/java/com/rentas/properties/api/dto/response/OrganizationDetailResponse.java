@@ -36,6 +36,8 @@ public class OrganizationDetailResponse {
     private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Long daysUntilTrialEnds;
+    private Long daysUntilSubscriptionEnds;
 
     @Data
     @Builder
