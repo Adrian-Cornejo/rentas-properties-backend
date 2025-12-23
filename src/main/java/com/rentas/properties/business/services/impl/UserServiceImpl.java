@@ -146,7 +146,7 @@ public class UserServiceImpl implements UserService {
             organization.decrementUsersCount();
             organizationRepository.save(organization);
             log.info("Contador de usuarios decrementado para organización {}: {}/{}",
-                    organization.getId(), organization.getCurrentUsersCount(), organization.getMaxUsers());
+                    organization.getId(), organization.getCurrentUsersCount(), organization.getSubscriptionPlan().getMaxUsers());
         }
 
         userRepository.save(user);
@@ -172,10 +172,10 @@ public class UserServiceImpl implements UserService {
                         organization.getId(),
                         organization.getPlanCode(),
                         organization.getCurrentUsersCount(),
-                        organization.getMaxUsers());
+                        organization.getSubscriptionPlan().getMaxUsers());
                 throw new OrganizationUserLimitException(
                         "No se puede activar el usuario. La organización ha alcanzado el límite máximo de usuarios (" +
-                                organization.getMaxUsers() + ") según su plan " + organization.getPlanCode() + ". " +
+                                organization.getSubscriptionPlan().getMaxUsers() + ") según su plan " + organization.getPlanCode() + ". " +
                                 "Por favor, mejore el plan para agregar más usuarios."
                 );
             }
@@ -183,7 +183,7 @@ public class UserServiceImpl implements UserService {
             organization.incrementUsersCount();
             organizationRepository.save(organization);
             log.info("Contador de usuarios incrementado para organización {}: {}/{}",
-                    organization.getId(), organization.getCurrentUsersCount(), organization.getMaxUsers());
+                    organization.getId(), organization.getCurrentUsersCount(), organization.getSubscriptionPlan().getMaxUsers());
         }
 
         user.setIsActive(true);
@@ -222,9 +222,9 @@ public class UserServiceImpl implements UserService {
                     organization.getId(),
                     organization.getPlanCode(),
                     organization.getCurrentUsersCount(),
-                    organization.getMaxUsers());
+                    organization.getSubscriptionPlan().getMaxUsers());
             throw new OrganizationUserLimitException(
-                    "La organización alcanzó el límite máximo de usuarios (" + organization.getMaxUsers() + ") " +
+                    "La organización alcanzó el límite máximo de usuarios (" + organization.getSubscriptionPlan().getMaxUsers() + ") " +
                             "según su plan " + organization.getPlanCode() + ". " +
                             "Por favor, solicita al administrador que mejore el plan."
             );
@@ -241,7 +241,7 @@ public class UserServiceImpl implements UserService {
 
         log.info("Usuario {} unido exitosamente a organización {}. Contador: {}/{}",
                 currentUser.getEmail(), organization.getName(),
-                organization.getCurrentUsersCount(), organization.getMaxUsers());
+                organization.getCurrentUsersCount(), organization.getSubscriptionPlan().getMaxUsers());
 
         return mapToDetailResponse(currentUser);
     }

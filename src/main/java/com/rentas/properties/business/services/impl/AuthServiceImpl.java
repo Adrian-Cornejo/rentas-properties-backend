@@ -69,9 +69,9 @@ public class AuthServiceImpl implements AuthService {
                 throw new OrganizationNotActiveException("La organización no está activa");
             }
 
-            if (organization.getCurrentUsersCount() >= organization.getMaxUsers()) {
+            if (organization.getCurrentUsersCount() >= organization.getSubscriptionPlan().getMaxUsers()) {
                 throw new OrganizationUserLimitException(
-                        "La organización alcanzó el límite máximo de usuarios (" + organization.getMaxUsers() + ")"
+                        "La organización alcanzó el límite máximo de usuarios (" + organization.getSubscriptionPlan().getMaxUsers() + ")"
                 );
             }
         }

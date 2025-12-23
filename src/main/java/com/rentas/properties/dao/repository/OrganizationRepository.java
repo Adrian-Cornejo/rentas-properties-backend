@@ -32,12 +32,6 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
     @Query("SELECT o FROM Organization o WHERE o.subscriptionStatus = 'active' AND o.subscriptionEndsAt < :date")
     List<Organization> findSubscriptionsExpiring(@Param("date") LocalDateTime date);
 
-    @Query("SELECT o FROM Organization o WHERE o.currentUsersCount >= o.maxUsers")
-    List<Organization> findOrganizationsAtUserLimit();
-
-    @Query("SELECT o FROM Organization o WHERE o.currentPropertiesCount >= o.maxProperties")
-    List<Organization> findOrganizationsAtPropertyLimit();
-
     @Query("SELECT o FROM Organization o WHERE o.notificationEnabled = true AND o.isActive = true")
     List<Organization> findOrganizationsWithNotificationsEnabled();
 

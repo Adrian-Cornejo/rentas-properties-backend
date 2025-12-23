@@ -76,15 +76,12 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .codeIsReusable(true)
                 .owner(currentUser)
                 .subscriptionPlan(starterPlan)
-                .maxUsers(starterPlan.getMaxUsers())
-                .maxProperties(starterPlan.getMaxProperties())
                 .currentUsersCount(1)
                 .currentPropertiesCount(0)
                 .subscriptionStatus("trial")
                 .trialEndsAt(trialEndsAt)
                 .subscriptionStartedAt(now)
                 .notificationEnabled(starterPlan.getHasNotifications())
-                .notificationLimit(starterPlan.getMonthlyNotificationLimit())
                 .notificationsSentThisMonth(0)
                 .lastNotificationReset(LocalDate.now())
                 .adminDigestEnabled(starterPlan.getHasAdminDigest())
@@ -279,11 +276,11 @@ public class OrganizationServiceImpl implements OrganizationService {
 
         if (!organization.canAddUser()) {
             log.warn("Código válido pero límite de usuarios alcanzado: {}. Plan: {}, Max: {}, Current: {}",
-                    code, organization.getPlanCode(), organization.getMaxUsers(), organization.getCurrentUsersCount());
+                    code, organization.getPlanCode(), organization.getSubscriptionPlan().getMaxUsers(), organization.getCurrentUsersCount());
             throw new InvitationCodeInvalidException(String.format(
                     "La organización ha alcanzado el límite máximo de usuarios (%d/%d). " +
                             "Por favor, solicite al administrador que mejore el plan.",
-                    organization.getCurrentUsersCount(), organization.getMaxUsers()
+                    organization.getCurrentUsersCount(), organization.getSubscriptionPlan().getMaxUsers()
             ));
         }
 
@@ -307,20 +304,20 @@ public class OrganizationServiceImpl implements OrganizationService {
         Long activeProperties = propertyRepository.countActiveByOrganization_Id(id);
 
         double usersPercentage = calculateUsagePercentage(
-                organization.getCurrentUsersCount(), organization.getMaxUsers());
+                organization.getCurrentUsersCount(), organization.getSubscriptionPlan().getMaxUsers());
         double propertiesPercentage = calculateUsagePercentage(
-                organization.getCurrentPropertiesCount(), organization.getMaxProperties());
+                organization.getCurrentPropertiesCount(), organization.getSubscriptionPlan().getMaxProperties());
 
         return OrganizationStatsResponse.builder()
                 .organizationId(organization.getId())
                 .organizationName(organization.getName())
                 .currentUsersCount(organization.getCurrentUsersCount())
-                .maxUsers(organization.getMaxUsers())
-                .usersAvailable(organization.getMaxUsers() - organization.getCurrentUsersCount())
+                .maxUsers(organization.getSubscriptionPlan().getMaxUsers())
+                .usersAvailable(organization.getSubscriptionPlan().getMaxUsers() - organization.getCurrentUsersCount())
                 .usersPercentage(usersPercentage)
                 .currentPropertiesCount(organization.getCurrentPropertiesCount())
-                .maxProperties(organization.getMaxProperties())
-                .propertiesAvailable(organization.getMaxProperties() - organization.getCurrentPropertiesCount())
+                .maxProperties(organization.getSubscriptionPlan().getMaxProperties())
+                .propertiesAvailable(organization.getSubscriptionPlan().getMaxProperties() - organization.getCurrentPropertiesCount())
                 .propertiesPercentage(propertiesPercentage)
                 .nearUserLimit(usersPercentage >= 80.0)
                 .nearPropertyLimit(propertiesPercentage >= 80.0)
@@ -405,9 +402,9 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .logoUrl(organization.getLogoUrl())
                 .subscriptionStatus(organization.getSubscriptionStatus())
                 .subscriptionPlan(organization.getPlanCode())
-                .maxProperties(organization.getMaxProperties())
+                .maxProperties(organization.getSubscriptionPlan().getMaxProperties())
                 .currentPropertiesCount(organization.getCurrentPropertiesCount())
-                .maxUsers(organization.getMaxUsers())
+                .maxUsers(organization.getSubscriptionPlan().getMaxUsers())
                 .currentUsersCount(organization.getCurrentUsersCount())
                 .primaryColor(organization.getPrimaryColor())
                 .secondaryColor(organization.getSecondaryColor())
@@ -515,8 +512,8 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .primaryColor(organization.getPrimaryColor())
                 .secondaryColor(organization.getSecondaryColor())
                 .invitationCode(organization.getInvitationCode())
-                .maxUsers(organization.getMaxUsers())
-                .maxProperties(organization.getMaxProperties())
+                .maxUsers(organization.getSubscriptionPlan().getMaxUsers())
+                .maxProperties(organization.getSubscriptionPlan().getMaxProperties())
                 .currentUsersCount(organization.getCurrentUsersCount())
                 .currentPropertiesCount(organization.getCurrentPropertiesCount())
                 .subscriptionPlan(organization.getPlanCode())
@@ -549,8 +546,8 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .invitationCode(organization.getInvitationCode())
                 .codeIsReusable(organization.getCodeIsReusable())
                 .owner(ownerDto)
-                .maxUsers(organization.getMaxUsers())
-                .maxProperties(organization.getMaxProperties())
+                .maxUsers(organization.getSubscriptionPlan().getMaxUsers())
+                .maxProperties(organization.getSubscriptionPlan().getMaxProperties())
                 .currentUsersCount(organization.getCurrentUsersCount())
                 .currentPropertiesCount(organization.getCurrentPropertiesCount())
                 .subscriptionId(organization.getPlanId())
