@@ -79,11 +79,6 @@ public class Organization {
     @JoinColumn(name = "owner_id", foreignKey = @ForeignKey(name = "fk_organization_owner"))
     private User owner;
 
-    @Column(name = "max_properties")
-    private Integer maxProperties;
-
-    @Column(name = "max_users")
-    private Integer maxUsers;
 
     @Column(name = "current_users_count")
     @Builder.Default
@@ -128,9 +123,6 @@ public class Organization {
 
     @Column(name = "notifications_sent_this_month")
     private Integer notificationsSentThisMonth;
-
-    @Column(name = "notification_limit")
-    private Integer notificationLimit;
 
     @Column(name = "last_notification_reset")
     private LocalDate lastNotificationReset;
@@ -186,9 +178,6 @@ public class Organization {
         if (notificationsSentThisMonth == null) {
             notificationsSentThisMonth = 0;
         }
-        if (notificationLimit == null) {
-            notificationLimit = 0;
-        }
         if (adminNotifications == null) {
             adminNotifications = true;
         }
@@ -228,15 +217,6 @@ public class Organization {
     public boolean isSubscriptionExpired() {
         return subscriptionEndsAt != null && LocalDateTime.now().isAfter(subscriptionEndsAt);
     }
-
-    public boolean hasReachedUserLimit() {
-        return currentUsersCount != null && maxUsers != null && currentUsersCount >= maxUsers;
-    }
-
-    public boolean hasReachedPropertyLimit() {
-        return currentPropertiesCount != null && maxProperties != null && currentPropertiesCount >= maxProperties;
-    }
-
 
 
     public void incrementUsersCount() {
@@ -286,9 +266,6 @@ public class Organization {
 
     public void syncLimitsFromPlan() {
         if (this.subscriptionPlan != null) {
-            this.maxProperties = subscriptionPlan.getMaxProperties();
-            this.maxUsers = subscriptionPlan.getMaxUsers();
-            this.notificationLimit = subscriptionPlan.getMonthlyNotificationLimit();
 
             if (subscriptionPlan.getNotificationChannels() != null) {
                 switch (subscriptionPlan.getNotificationChannels()) {
@@ -328,13 +305,6 @@ public class Organization {
     public int getImagesPerPropertyLimit() {
         if (subscriptionPlan == null) return 0;
         return subscriptionPlan.getImagesPerProperty();
-    }
-
-
-    public boolean canSendNotification() {
-        if (!notificationEnabled) return false;
-        if (notificationLimit == -1) return true; // Ilimitado
-        return notificationsSentThisMonth < notificationLimit;
     }
 
     public String getPlanCode() {

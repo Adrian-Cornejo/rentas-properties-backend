@@ -52,9 +52,9 @@ public class PropertyServiceImpl implements PropertyService {
                     organization.getId(),
                     organization.getPlanCode(),
                     organization.getCurrentPropertiesCount(),
-                    organization.getMaxProperties());
+                    organization.getSubscriptionPlan().getMaxProperties());
             throw new OrganizationPropertyLimitException(
-                    "Has alcanzado el límite máximo de propiedades (" + organization.getMaxProperties() + ") " +
+                    "Has alcanzado el límite máximo de propiedades (" + organization.getSubscriptionPlan().getMaxProperties() + ") " +
                             "según tu plan " + organization.getPlanCode() + ". " +
                             "Por favor, mejora tu plan para agregar más propiedades."
             );
@@ -118,7 +118,7 @@ public class PropertyServiceImpl implements PropertyService {
         organizationRepository.save(organization);
 
         log.info("Propiedad creada exitosamente con ID: {} - Contador de organización: {}/{}",
-                savedProperty.getId(), organization.getCurrentPropertiesCount(), organization.getMaxProperties());
+                savedProperty.getId(), organization.getCurrentPropertiesCount(), organization.getSubscriptionPlan().getMaxProperties());
 
         return mapToDetailResponse(savedProperty);
     }
