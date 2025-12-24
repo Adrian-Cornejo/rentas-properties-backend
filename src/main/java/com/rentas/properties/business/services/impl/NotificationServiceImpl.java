@@ -437,7 +437,7 @@ public class NotificationServiceImpl {
 
         // Si ya tiene +52, validar formato
         if (phone.startsWith("+52")) {
-            if (phone.matches("^\\+52[0-9]{10}$")) {
+            if (phone.matches("^\\+52[0-9]{11}$")) {
                 return phone;
             } else {
                 throw new InvalidPhoneNumberException("Formato inválido: " + phone);

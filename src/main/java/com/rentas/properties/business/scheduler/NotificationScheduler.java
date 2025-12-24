@@ -25,7 +25,7 @@ public class NotificationScheduler {
      * Job que se ejecuta diariamente a las 8:00 AM hora México
      * Procesa todos los recordatorios de pago del día
      */
-    @Scheduled(cron = "${notification.job.cron:0 0 8 * * ?}") // 8:00 AM todos los días
+    @Scheduled(cron = "${notification.job.cron:0 0 0 * * ?}") // 8:00 AM todos los días
     @Transactional
     public void processDailyPaymentReminders() {
         log.info("========== INICIO: Proceso de recordatorios diarios ==========");

@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 public class SendTestNotificationRequest {
 
     @NotBlank(message = "El teléfono es obligatorio")
-    @Pattern(regexp = "^\\+52[0-9]{10}$", message = "El teléfono debe estar en formato +52XXXXXXXXXX")
+    @Pattern(regexp = "^\\+52[0-9]{11}$", message = "El teléfono debe estar en formato +52XXXXXXXXXX")
     private String phoneNumber;
 
     @NotBlank(message = "El canal es obligatorio")

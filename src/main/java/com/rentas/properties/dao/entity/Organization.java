@@ -324,6 +324,7 @@ public class Organization {
             case "PDF_REPORTS" -> subscriptionPlan.getHasPdfReports();
             case "API_ACCESS" -> subscriptionPlan.getHasApiAccess();
             case "WHITE_LABEL" -> subscriptionPlan.getHasWhiteLabel();
+            case "NOTIFICATIONS"-> subscriptionPlan.getHasNotifications();
             default -> false;
         };
     }
